@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+{% from "macros.html" import icon, product_card %}
+
+{% block content %}
+<section class="border-b border-sand bg-cream">
+  <div class="page-shell py-12 md:py-16">
+    <div class="max-w-3xl">
+      <p class="eyebrow text-clay">Natural care, thoughtfully made</p>
+      <h1 class="mt-3 font-display text-5xl font-semibold leading-none md:text-7xl">{{ collection_title }}</h1>
+      <p class="mt-5 max-w-2xl text-base leading-7 text-bark">Explore small-batch care for skin, hair, body and beard, centred on unrefined shea and purposeful botanical ingredients.</p>
+    </div>
+  </div>
+</section>
+
+<section class="py-10 md:py-14">
+  <div class="page-shell">
+    <form action="{{ url_for('shop') }}" method="get" class="flex flex-col gap-4 border-b border-sand pb-6 md:flex-row md:items-end md:justify-between">
+      <div class="flex flex-wrap gap-2">
+        <a href="{{ url_for('shop') }}" class="min-h-11 border px-4 py-3 text-xs font-semibold uppercase tracking-[0.08em] {% if not active_category %}border-ink bg-ink text-white{% else %}border-sand bg-cream{% endif %}">All</a>
+        {% for category in categories %}
+          <a href="{{ url_for('shop', category=category) }}" class="min-h-11 border px-4 py-3 text-xs font-semibold uppercase tracking-[0.08em] {% if active_category == category %}border-ink bg-ink text-white{% else %}border-sand bg-cream{% endif %}">{{ category }}</a>
+        {% endfor %}
+      </div>
+      <div class="flex w-full max-w-sm border-b-2 border-ink">
+        <label for="collection-search" class="sr-only">Search products</label>
+        <input id="collection-search" name="q" value="{{ query }}" type="search" class="min-h-12 min-w-0 flex-1 bg-transparent text-base" placeholder="Search products or ingredients">
+        <button class="icon-button" aria-label="Search">{{ icon("search") }}</button>
+      </div>
+    </form>
+
+    <div data-collection-controls class="mt-6 grid gap-4 border-y border-sand py-5 md:grid-cols-[1fr_auto_auto] md:items-end">
+      <p class="pb-1 text-sm" aria-live="polite"><strong data-product-count>{{ products|length }}</strong> product<span data-product-count-suffix>{% if products|length != 1 %}s{% endif %}</span></p>
+      <label class="grid gap-1 text-xs font-semibold uppercase tracking-wide">
+        <span class="text-bark">Price range</span>
+        <select data-price-filter class="min-h-11 border border-sand bg-cream px-3 text-sm normal-case tracking-normal">
+          <option value="all">All prices</option>
+          <option value="0-25" data-price-option="under" data-value-one="25">Under $25</option>
+          <option value="25-50" data-price-option="range" data-value-one="25" data-value-two="50">$25–$50</option>
+          <option value="50-plus" data-price-option="plus" data-value-one="50">$50+</option>
+        </select>
+      </label>
+      <label class="grid gap-1 text-xs font-semibold uppercase tracking-wide">
+        <span class="text-bark">Product tag</span>
+        <select data-tag-filter class="min-h-11 border border-sand bg-cream px-3 text-sm normal-case tracking-normal">
+          <option value="all">All tags</option>
+          {% for tag in product_tags %}<option value="{{ tag }}" {% if active_tag == tag %}selected{% endif %}>{{ tag }}</option>{% endfor %}
+        </select>
+      </label>
+      <label class="grid gap-1 text-xs font-semibold uppercase tracking-wide md:col-start-3">
+        <span class="text-bark">Sort</span>
+        <select data-sort-products class="min-h-11 border border-sand bg-cream px-3 text-sm normal-case tracking-normal">
+          <option value="newest">Newest</option>
+          <option value="best-selling">Best Selling</option>
+          <option value="price-low">Price: Low to High</option>
+          <option value="price-high">Price: High to Low</option>
+          <option value="top-rated">Top Rated</option>
+        </select>
+      </label>
+    </div>
+
+    {% if products %}
+      <div data-product-grid class="mt-8 grid grid-cols-2 gap-x-4 gap-y-10 lg:grid-cols-4 lg:gap-x-6">
+        {% for product in products %}{{ product_card(product, loop.index0) }}{% endfor %}
+      </div>
+      <div data-filter-empty hidden class="my-20 border border-sand bg-cream px-6 py-16 text-center">
+        <h2 class="font-display text-4xl font-semibold">No rituals match those filters</h2>
+        <p class="mx-auto mt-4 max-w-md text-bark">Try another price range or product tag.</p>
+        <button type="button" data-clear-filters class="btn-primary mt-7">Clear filters</button>
+      </div>
+    {% else %}
+      <div class="my-20 border border-sand bg-cream px-6 py-16 text-center">
+        <h2 class="font-display text-4xl font-semibold">No rituals found</h2>
+        <p class="mx-auto mt-4 max-w-md text-bark">Try another ingredient or browse the full collection.</p>
+        <a href="{{ url_for('shop') }}" class="btn-primary mt-7">View all products</a>
+      </div>
+    {% endif %}
+  </div>
+</section>
+{% endblock %}

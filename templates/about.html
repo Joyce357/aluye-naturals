@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+
+{% block content %}
+<section class="grid min-h-[34rem] bg-ink text-white lg:grid-cols-2">
+  <div class="flex items-center px-6 py-16 sm:px-12 lg:px-20">
+    <div class="max-w-xl"><p class="eyebrow text-shea">Our story</p><h1 class="mt-4 font-display text-6xl font-semibold leading-[0.95] md:text-7xl">Nature’s finest, carried forward.</h1><p class="mt-6 text-lg leading-8 text-white/80">Aluyè Naturals brings time-tested West African ingredients into modern skin, hair, body and grooming rituals.</p></div>
+  </div>
+  <img src="{{ url_for('media', collection='hero', filename='aluye-ritual-hero.webp') }}" alt="Aluyè Naturals products displayed with natural materials" width="1600" height="901" class="h-full min-h-[28rem] w-full object-cover">
+</section>
+<section class="page-shell py-16 md:py-24">
+  <div class="grid gap-12 lg:grid-cols-[0.7fr_1.3fr]">
+    <div><p class="eyebrow text-neutral-500">Body. Mind. Soul.</p><h2 class="mt-4 font-display text-5xl font-semibold leading-none">Care with roots.</h2></div>
+    <div class="space-y-6 text-lg leading-8 text-neutral-700"><p>Our journey began with a simple belief: nature already provides remarkable materials for caring for skin and hair. The role of Aluyè is to select them thoughtfully, preserve their character and make them easy to welcome into everyday life.</p><p>At the heart of the range is unrefined shea butter sourced from West Africa. Its natural richness supports our body butters, beard care and hair treatments, while African black soap, charcoal and cold-pressed oils broaden the ritual.</p><p>We believe self-care should feel effective, grounded and generous—not complicated. Every product is an invitation to slow down and reconnect with the body.</p></div>
+  </div>
+</section>
+<section id="ingredients" class="bg-neutral-100 py-16 md:py-24">
+  <div class="page-shell grid gap-8 md:grid-cols-3">
+    {% for title, copy in [("Purity", "No unnecessary fillers. Ingredients are selected for a clear purpose and an honest sensory experience."), ("Provenance", "We honour the places, artisans and traditions that give shea butter and black soap their meaning."), ("Everyday ritual", "Our formulas are designed to be reached for often—after a shower, before bed, on wash day or while grooming.")] %}
+    <article class="border-t-2 border-black pt-6"><h3 class="font-display text-4xl font-semibold">{{ title }}</h3><p class="mt-4 leading-7 text-neutral-600">{{ copy }}</p></article>
+    {% endfor %}
+  </div>
+</section>
+{% endblock %}

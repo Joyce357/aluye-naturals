@@ -1,0 +1,28 @@
+{% extends "admin/base.html" %}{% block title %}Product Editor | Aluyè Admin{% endblock %}
+{% block content %}
+<div><a href="{{ url_for('admin.products') }}" class="text-sm font-semibold underline">← Back to products</a><h1 class="mt-4 font-display text-5xl font-semibold">{{ "Edit product" if product else "Add new product" }}</h1></div>
+<form method="post" enctype="multipart/form-data" class="mt-8 grid gap-6 xl:grid-cols-[1fr_22rem]">
+  <div class="space-y-6"><section class="border border-sand bg-white p-6"><h2 class="font-display text-3xl font-semibold">Product information</h2><div class="mt-5 grid gap-5 sm:grid-cols-2">
+    <label class="grid gap-2 text-sm font-semibold sm:col-span-2">Product name<input name="name" required value="{{ product.get('name','') }}" class="min-h-12 border border-sand px-4"></label>
+    <label class="grid gap-2 text-sm font-semibold">Slug<input name="slug" required value="{{ product.get('slug','') }}" class="min-h-12 border border-sand px-4"></label>
+    <label class="grid gap-2 text-sm font-semibold">Category<select name="category" class="min-h-12 border border-sand px-4">{% for category in categories %}<option {% if product.get('segment') == category %}selected{% endif %}>{{ category }}</option>{% endfor %}</select></label>
+    <label class="grid gap-2 text-sm font-semibold">Subcategory<input name="subcategory" value="{{ product.get('category','') }}" class="min-h-12 border border-sand px-4"></label>
+    <label class="grid gap-2 text-sm font-semibold">Size<input name="size" value="{{ product.get('size','') }}" class="min-h-12 border border-sand px-4"></label>
+    <label class="grid gap-2 text-sm font-semibold sm:col-span-2">Short description<textarea name="short_description" rows="2" class="border border-sand p-4">{{ product.get('benefit','') }}</textarea></label>
+    <label class="grid gap-2 text-sm font-semibold sm:col-span-2">Long description<textarea name="description" rows="7" class="border border-sand p-4">{{ product.get('description','') }}</textarea></label>
+    <label class="grid gap-2 text-sm font-semibold sm:col-span-2">Ingredients, comma separated<input name="ingredients" value="{{ product.get('ingredients',[])|join(', ') }}" class="min-h-12 border border-sand px-4"></label>
+    <label class="grid gap-2 text-sm font-semibold">Best for<input name="best_for" value="{{ product.get('best_for','') }}" class="min-h-12 border border-sand px-4"></label>
+    <label class="grid gap-2 text-sm font-semibold">How to use<input name="how_to" value="{{ product.get('how_to','') }}" class="min-h-12 border border-sand px-4"></label>
+  </div></section></div>
+  <aside class="space-y-6"><section class="border border-sand bg-white p-6"><h2 class="font-display text-2xl font-semibold">Commerce</h2><div class="mt-5 space-y-4">
+    <label class="grid gap-2 text-sm font-semibold">Price<input name="price" type="number" step=".01" required value="{{ product.get('price','') }}" class="min-h-12 border border-sand px-4"></label>
+    <label class="grid gap-2 text-sm font-semibold">Compare-at price<input name="compare_at" type="number" step=".01" value="{{ product.get('compare_at','') }}" class="min-h-12 border border-sand px-4"></label>
+    <label class="grid gap-2 text-sm font-semibold">Stock<input name="stock" type="number" value="{{ product.get('stock',20) }}" class="min-h-12 border border-sand px-4"></label>
+    <label class="grid gap-2 text-sm font-semibold">Status<select name="status" class="min-h-12 border border-sand px-4"><option value="active">Active</option><option value="draft" {% if product.get('status')=='draft' %}selected{% endif %}>Draft</option></select></label>
+    <label class="grid gap-2 text-sm font-semibold">Current image filename<input name="image" value="{{ product.get('image','photo_2_2026-06-08_18-19-49.webp') }}" class="min-h-12 border border-sand px-4"></label>
+    <label class="grid gap-2 text-sm font-semibold">Upload product images<input name="images" type="file" multiple accept="image/*" class="min-h-12 border border-sand p-3"><span class="text-xs font-normal text-bark">The first upload becomes the main image.</span></label>
+    <fieldset><legend class="text-sm font-semibold">Badges</legend><div class="mt-3 grid gap-2 text-sm">{% for badge in ["Best Seller","New","Gift Set","Limited","Raw Essential"] %}<label><input type="checkbox" name="badges" value="{{ badge }}" {% if badge in product.get('tags',[]) %}checked{% endif %}> {{ badge }}</label>{% endfor %}</div></fieldset>
+    <div class="grid grid-cols-2 gap-3"><label class="grid gap-2 text-sm font-semibold">Rating<input name="rating" type="number" step=".1" value="{{ product.get('rating',4.8) }}" class="min-h-11 border border-sand px-3"></label><label class="grid gap-2 text-sm font-semibold">Reviews<input name="reviews" type="number" value="{{ product.get('reviews',0) }}" class="min-h-11 border border-sand px-3"></label></div>
+  </div></section><button class="btn-primary w-full">Save product</button></aside>
+</form>
+{% endblock %}

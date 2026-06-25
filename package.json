@@ -1,0 +1,17 @@
+{
+  "name": "aluye-naturals-storefront",
+  "private": true,
+  "scripts": {
+    "css:build": "tailwindcss -i ./static/src/input.css -o ./static/css/app.css --minify",
+    "css:watch": "tailwindcss -i ./static/src/input.css -o ./static/css/app.css --watch",
+    "lighthouse": "powershell -ExecutionPolicy Bypass -File ./scripts/run-lighthouse.ps1",
+    "lighthouse:collect": "lhci collect --config=./lighthouserc.cjs",
+    "lighthouse:assert": "lhci assert --config=./lighthouserc.cjs"
+  },
+  "devDependencies": {
+    "@lhci/cli": "^0.15.1",
+    "@tailwindcss/cli": "^4.1.17",
+    "lighthouse": "^12.6.1",
+    "tailwindcss": "^4.1.17"
+  }
+}

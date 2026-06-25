@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+
+{% block content %}
+<section class="page-shell py-20 text-center md:py-28">
+  <p class="eyebrow text-success">Order confirmed</p>
+  <h1 class="mx-auto mt-4 max-w-3xl font-display text-5xl font-semibold leading-none md:text-7xl">Thank you, {{ customer.first_name }}.</h1>
+  <p class="mx-auto mt-6 max-w-xl text-lg leading-8 text-bark">Your order <strong>{{ order_number }}</strong> is being prepared. A confirmation will be sent to {{ customer.email }}.</p>
+  <div class="mx-auto mt-10 max-w-xl border border-sand bg-cream p-6 text-left">
+    <h2 class="font-display text-3xl font-semibold">Order summary</h2>
+    <div class="mt-5 divide-y divide-sand">
+      {% for item in items %}
+        <div class="flex justify-between gap-4 py-4 text-sm"><span>{{ item.quantity }} × {{ item.product.name }}</span><strong data-money data-price="{{ item.line_total }}">${{ item.line_total }}</strong></div>
+      {% endfor %}
+    </div>
+    <div class="space-y-2 border-t border-sand pt-4 text-sm">
+      <div class="flex justify-between"><span>Subtotal</span><span data-money data-price="{{ subtotal }}">${{ subtotal }}</span></div>
+      <div class="flex justify-between"><span>Delivery</span><span>{% if delivery %}<span data-money data-price="{{ delivery }}">${{ delivery }}</span>{% else %}Free{% endif %}</span></div>
+    </div>
+    <div class="mt-4 flex justify-between border-t border-ink pt-4 font-semibold"><span>Total</span><span data-money data-price="{{ total }}">${{ total }}</span></div>
+  </div>
+  <a href="{{ url_for('shop') }}" class="btn-primary mt-9">Continue shopping</a>
+</section>
+{% endblock %}

@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+
+{% block content %}
+<article>
+  <header class="border-b border-neutral-200 bg-neutral-100 py-14 md:py-20">
+    <div class="page-shell max-w-4xl"><a href="{{ url_for('blog') }}" class="text-sm font-bold underline">Back to journal</a><p class="eyebrow mt-10 text-clay">{{ post["tag"] }}</p><h1 class="mt-4 font-display text-6xl font-semibold leading-[0.95] md:text-8xl">{{ post["title"] }}</h1><p class="mt-6 max-w-2xl text-lg leading-8 text-neutral-600">{{ post["excerpt"] }}</p></div>
+  </header>
+  <div class="page-shell max-w-3xl py-14 md:py-20">
+    {% for paragraph in post["body"] %}<p class="mb-7 text-lg leading-9 text-neutral-700">{{ paragraph }}</p>{% endfor %}
+    <div class="mt-14 border-t border-neutral-200 pt-8"><a href="{{ url_for('shop') }}" class="btn-primary">Explore the collection</a></div>
+  </div>
+</article>
+{% endblock %}

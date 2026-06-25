@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Aluyè Admin{% endblock %}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}">
+  <script src="{{ url_for('static', filename='js/admin.js') }}" defer></script>
+</head>
+<body class="bg-[#f9f6f1] text-ink">
+  <div class="min-h-dvh lg:grid lg:grid-cols-[17rem_1fr]">
+    <aside id="admin-sidebar" class="fixed inset-y-0 left-0 z-50 hidden w-72 overflow-y-auto bg-[#1a1a1a] text-white lg:static lg:block lg:w-auto">
+      <div class="flex min-h-20 items-center justify-between border-b border-white/15 px-6">
+        <a href="{{ url_for('admin.dashboard') }}"><span class="font-display text-2xl font-semibold">Aluyè Naturals</span><span class="block text-[0.6rem] uppercase tracking-[0.22em] text-white/55">Administration</span></a>
+        <button type="button" data-admin-menu-close class="flex size-11 items-center justify-center lg:hidden" aria-label="Close navigation"><svg class="size-5" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="m5 5 14 14M19 5 5 19"/></svg></button>
+      </div>
+      <nav class="space-y-1 p-4" aria-label="Admin navigation">
+        {% for key, label in admin_nav %}
+          {% if key in ["settings", "payments"] %}
+            {% set href = url_for('admin.configurable_section', section=key) %}
+          {% else %}
+            {% set href = url_for('admin.' + key) %}
+          {% endif %}
+          <a href="{{ href }}" class="flex min-h-11 items-center justify-between border-l-2 px-4 text-sm transition {% if admin_section == key %}border-shea bg-white/10 text-white{% else %}border-transparent text-white/65 hover:bg-white/5 hover:text-white{% endif %}">
+            <span>{{ label }}</span>
+            {% if key == "messages" and admin_unread_messages %}<span class="rounded-full bg-clay px-2 py-0.5 text-[0.65rem] font-bold">{{ admin_unread_messages }}</span>{% endif %}
+          </a>
+        {% endfor %}
+      </nav>
+      <div class="m-4 border border-white/15 p-4 text-xs text-white/65">
+        <p class="font-semibold text-white">{{ admin_user.name }}</p>
+        <p class="mt-1">{{ admin_user.role }}</p>
+        <a href="{{ url_for('admin.logout') }}" class="mt-4 inline-block underline">Sign out</a>
+      </div>
+    </aside>
+
+    <div class="min-w-0">
+      <header class="sticky top-0 z-30 flex min-h-16 items-center justify-between border-b border-sand bg-[#f9f6f1]/95 px-4 backdrop-blur md:px-8">
+        <div class="flex items-center gap-3">
+          <button type="button" data-admin-menu-open class="flex size-11 items-center justify-center border border-sand lg:hidden" aria-label="Open navigation"><svg class="size-5" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
+          <div><p class="text-xs uppercase tracking-wider text-bark">Store administration</p><p class="font-semibold">{{ admin_user.name }}</p></div>
+        </div>
+        <div class="flex items-center gap-2">
+          <a href="{{ url_for('admin.notifications') }}" class="relative flex size-11 items-center justify-center border border-sand bg-white" aria-label="Notifications"><svg class="size-5" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9"/><path d="M10 21h4"/></svg>{% if admin_unread_notifications %}<span class="absolute -right-1 -top-1 flex size-5 items-center justify-center rounded-full bg-clay text-[0.6rem] font-bold text-white">{{ admin_unread_notifications }}</span>{% endif %}</a>
+          <a href="{{ url_for('home') }}" class="hidden min-h-11 items-center border border-ink px-4 text-xs font-bold uppercase tracking-wide sm:flex">View store</a>
+        </div>
+      </header>
+      {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}<div class="fixed right-4 top-20 z-[70] space-y-2" aria-live="polite">{% for category, message in messages %}<div class="max-w-sm border bg-white px-5 py-4 text-sm font-semibold shadow-xl {% if category == 'error' %}border-error text-error{% else %}border-success text-success{% endif %}">{{ message }}</div>{% endfor %}</div>{% endif %}
+      {% endwith %}
+      <main class="p-4 md:p-8 xl:p-10">{% block content %}{% endblock %}</main>
+    </div>
+  </div>
+</body>
+</html>

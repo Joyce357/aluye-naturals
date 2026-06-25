@@ -1,0 +1,138 @@
+{% extends "base.html" %}
+{% from "macros.html" import icon, product_card %}
+
+{% block content %}
+<section class="page-shell py-5 md:py-7">
+  <div class="hero-slider relative overflow-hidden bg-black text-white" data-hero-slider aria-roledescription="carousel" aria-label="Featured Aluyè Naturals collections">
+    <div class="relative aspect-[4/5] md:aspect-[16/7]">
+      {% for slide in hero_slides %}
+      <article class="hero-slide absolute inset-0 transition-opacity duration-300 {% if not loop.first %}pointer-events-none opacity-0{% endif %}" data-hero-slide aria-hidden="{{ 'false' if loop.first else 'true' }}" {% if not loop.first %}inert{% endif %}>
+        <img {% if loop.first %}src="{{ url_for('media', collection='hero', filename=slide.image) }}" fetchpriority="high"{% else %}src="data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs=" data-src="{{ url_for('media', collection='hero', filename=slide.image) }}"{% endif %} alt="" width="1600" height="700" decoding="async" class="absolute inset-0 h-full w-full object-cover object-center">
+        <div class="absolute inset-0 bg-gradient-to-r from-black/80 via-black/35 to-transparent"></div>
+        <div class="relative flex h-full items-center px-6 py-12 sm:px-12 lg:px-20">
+          <div class="max-w-xl">
+            <p class="eyebrow text-white">{{ slide.eyebrow }}</p>
+            {% if loop.first %}
+              <h1 class="mt-4 font-display text-5xl font-semibold leading-[0.95] md:text-7xl">{{ homepage_settings.get('hero_headline', slide.title) }}</h1>
+            {% else %}
+              <h2 class="mt-4 font-display text-5xl font-semibold leading-[0.95] md:text-7xl">{{ slide.title }}</h2>
+            {% endif %}
+            <p class="mt-5 max-w-md text-base leading-7 text-white/85 md:text-lg">{{ homepage_settings.get('hero_subheadline', slide["copy"]) if loop.first else slide["copy"] }}</p>
+            {% if slide.category %}
+              <a href="{{ homepage_settings.get('hero_link', url_for('shop', category=slide.category)) if loop.first else url_for('shop', category=slide.category) }}" class="mt-7 inline-flex min-h-12 items-center bg-white px-6 text-sm font-bold text-black">{{ homepage_settings.get('hero_button', slide.label) if loop.first else slide.label }}</a>
+            {% else %}
+              <a href="{{ url_for('about') }}" class="mt-7 inline-flex min-h-12 items-center bg-white px-6 text-sm font-bold text-black">{{ slide.label }}</a>
+            {% endif %}
+          </div>
+        </div>
+      </article>
+      {% endfor %}
+      <button type="button" data-hero-prev class="absolute left-0 top-1/2 z-10 flex size-12 -translate-y-1/2 items-center justify-center bg-white text-black" aria-label="Previous slide">‹</button>
+      <button type="button" data-hero-next class="absolute right-0 top-1/2 z-10 flex size-12 -translate-y-1/2 items-center justify-center bg-white text-black" aria-label="Next slide">›</button>
+      <div class="absolute bottom-5 left-1/2 z-10 flex -translate-x-1/2 gap-2">
+        {% for slide in hero_slides %}<button type="button" data-hero-dot="{{ loop.index0 }}" class="h-1.5 w-8 bg-white {% if not loop.first %}opacity-40{% endif %}" aria-label="Go to slide {{ loop.index }}"></button>{% endfor %}
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="border-y border-neutral-200 bg-white">
+  <div class="page-shell grid grid-cols-1 divide-y divide-neutral-200 sm:grid-cols-3 sm:divide-x sm:divide-y-0">
+    {% for title, detail in [("Unrefined ingredients", "Kept close to their natural form"), ("West African roots", "Inspired by generations of beauty knowledge"), ("Made for every ritual", "Skin, hair, oils and men’s grooming")] %}
+      <div class="px-4 py-5 text-center"><p class="text-sm font-bold">{{ title }}</p><p class="mt-1 text-xs text-neutral-500">{{ detail }}</p></div>
+    {% endfor %}
+  </div>
+</section>
+
+<section class="py-16 md:py-24">
+  <div class="page-shell">
+    <div class="text-center"><p class="eyebrow text-neutral-600">Find your category</p><h2 class="section-heading mt-3">Shop Aluyè</h2></div>
+    <div class="mt-9 grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-6">
+      {% for category, image in homepage_categories %}
+      <a href="{{ url_for('shop', category=category) }}" class="group text-center">
+        <div class="aspect-square overflow-hidden rounded-full border border-neutral-200 bg-white"><img src="{{ url_for('media', collection='products', filename=image) }}" alt="" width="640" height="640" loading="lazy" decoding="async" class="h-full w-full object-contain p-3 transition-transform duration-300 group-hover:scale-105"></div>
+        <h3 class="mt-4 text-sm font-bold">{{ category }}</h3>
+      </a>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+
+{% if homepage_settings.get('new_arrivals', true) %}
+<section class="border-y border-sand bg-cream py-16 md:py-20">
+  <div class="page-shell">
+    <div class="flex items-end justify-between gap-6">
+      <div><p class="eyebrow text-neutral-600">Curated for your ritual</p><h2 class="section-heading mt-3">New This Season</h2></div>
+      <a href="{{ url_for('shop', tag='New') }}" class="hidden items-center gap-2 text-sm font-bold underline sm:flex">Shop all {{ icon("arrow") }}</a>
+    </div>
+    <div class="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3 lg:gap-6">
+      {% for product in new_arrivals %}{{ product_card(product, loop.index0) }}{% endfor %}
+    </div>
+  </div>
+</section>
+{% endif %}
+
+{% for segment, segment_products in product_segments %}
+{% if segment_products %}
+<section class="{% if loop.index is even %}bg-neutral-100{% else %}bg-white{% endif %} py-16 md:py-20">
+  <div class="page-shell">
+    <div class="flex items-end justify-between gap-6">
+      <div><p class="eyebrow text-neutral-600">Curated for your ritual</p><h2 class="section-heading mt-3">{{ segment }}</h2></div>
+      <a href="{{ url_for('shop', category=segment) }}" class="hidden items-center gap-2 text-sm font-bold underline sm:flex">Shop all {{ icon("arrow") }}</a>
+    </div>
+    <div class="mt-8 flex snap-x snap-mandatory gap-4 overflow-x-auto pb-5 lg:grid lg:grid-cols-4 lg:overflow-visible lg:pb-0">
+      {% for product in segment_products[:3] %}{{ product_card(product) }}{% endfor %}
+    </div>
+  </div>
+</section>
+{% if segment == "Men" and homepage_settings.get('best_sellers', true) %}
+<section class="border-y border-sand bg-bone py-16 md:py-20">
+  <div class="page-shell">
+    <div class="flex items-end justify-between gap-6">
+      <div><p class="eyebrow text-neutral-600">Loved by the Aluyè community</p><h2 class="section-heading mt-3">Best Sellers</h2></div>
+      <a href="{{ url_for('shop', tag='Best Seller') }}" class="hidden items-center gap-2 text-sm font-bold underline sm:flex">Shop all {{ icon("arrow") }}</a>
+    </div>
+    <div class="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3 lg:gap-6">
+      {% for product in best_sellers %}{{ product_card(product, loop.index0) }}{% endfor %}
+    </div>
+  </div>
+</section>
+{% endif %}
+{% endif %}
+{% endfor %}
+
+{% if homepage_settings.get('brand_story', true) %}
+<section class="grid bg-botanical text-white lg:grid-cols-2">
+  <img src="{{ url_for('media', collection='hero', filename='aluye-beard-hero.webp') }}" alt="Aluyè Naturals men’s beard care range" width="1600" height="901" loading="lazy" class="h-full min-h-[28rem] w-full object-cover">
+  <div class="flex items-center px-6 py-16 sm:px-12 lg:px-20">
+    <div class="max-w-xl"><p class="eyebrow">From West Africa, with care</p><h2 class="section-heading mt-4">Heritage ingredients. Modern everyday care.</h2><p class="mt-6 text-lg leading-8 text-white/85">Our formulas begin with ingredients people have trusted for generations—unrefined shea, African black soap and purposeful botanical oils—then shape them into practical rituals for today.</p><a href="{{ url_for('about') }}" class="mt-8 inline-flex min-h-12 items-center bg-white px-6 text-sm font-bold text-black">Read our story</a></div>
+  </div>
+</section>
+{% endif %}
+
+{% if homepage_settings.get('ingredients', true) %}
+<section id="ingredients" class="py-16 md:py-24">
+  <div class="page-shell">
+    <div class="max-w-2xl"><p class="eyebrow text-neutral-600">Ingredient intelligence</p><h2 class="section-heading mt-3">Powerful by nature</h2><p class="mt-5 text-base leading-7 text-neutral-600">A closer look at the ingredients behind Aluyè’s everyday rituals.</p></div>
+    <div class="mt-10 grid gap-px border border-neutral-200 bg-neutral-200 sm:grid-cols-2 lg:grid-cols-4">
+      {% for ingredient in ingredients %}
+      <article class="bg-white p-7"><p class="eyebrow text-clay">{{ ingredient["origin"] }}</p><h3 class="mt-8 font-display text-3xl font-semibold">{{ ingredient["name"] }}</h3><p class="mt-4 text-sm leading-6 text-neutral-600">{{ ingredient["description"] }}</p><a href="{{ url_for('blog') }}" class="mt-8 inline-flex items-center gap-2 text-sm font-bold">Explore {{ ingredient["name"] }} {{ icon("arrow", "size-4") }}</a></article>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+{% endif %}
+
+{% if homepage_settings.get('journal', true) %}
+<section class="bg-black py-16 text-white md:py-24">
+  <div class="page-shell">
+    <div class="text-center"><p class="eyebrow text-shea">The Aluyè journal</p><h2 class="section-heading mt-3">Stories behind the ritual</h2></div>
+    <div class="mt-10 grid gap-px bg-white/20 md:grid-cols-3">
+      {% for story in journal %}
+      <article class="bg-black p-7 md:p-9"><p class="eyebrow text-shea">{{ story["tag"] }}</p><h3 class="mt-6 font-display text-3xl font-semibold leading-tight">{{ story["title"] }}</h3><p class="mt-4 text-sm leading-6 text-white/65">{{ story["excerpt"] }}</p><a href="{{ url_for('blog_post', slug=story.slug) }}" class="mt-7 inline-flex items-center gap-2 text-sm font-bold">Read story {{ icon("arrow", "size-4") }}</a></article>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+{% endif %}
+{% endblock %}

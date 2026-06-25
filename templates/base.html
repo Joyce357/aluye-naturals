@@ -1,0 +1,250 @@
+{% from "macros.html" import icon %}
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}{{ seo.title if seo else "Aluyè Naturals | Body. Mind. Soul." }}{% endblock %}</title>
+  <meta name="description" content="{{ seo.description if seo else 'Natural skin, hair, body and beard care rooted in West African beauty rituals.' }}">
+  <meta name="robots" content="{{ seo.robots if seo else 'index,follow' }}">
+  <meta name="googlebot" content="{{ seo.robots if seo else 'index,follow' }}">
+  <meta name="theme-color" content="#000000">
+  <link rel="canonical" href="{{ seo.canonical_url if seo else site_url }}">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="{{ site_name }}">
+  <meta property="og:title" content="{{ seo.title if seo else site_name }}">
+  <meta property="og:description" content="{{ seo.description if seo else '' }}">
+  <meta property="og:url" content="{{ seo.canonical_url if seo else site_url }}">
+  <meta property="og:image" content="{{ seo.image_url if seo else '' }}">
+  <meta property="og:image:alt" content="{{ seo.image_alt if seo else '' }}">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="{{ seo.title if seo else site_name }}">
+  <meta name="twitter:description" content="{{ seo.description if seo else '' }}">
+  <meta name="twitter:image" content="{{ seo.image_url if seo else '' }}">
+  <link rel="icon" type="image/png" href="{{ url_for('static', filename='images/favicon.png') }}">
+  {% for schema in structured_data|default([]) %}<script type="application/ld+json">{{ schema|tojson }}</script>{% endfor %}
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}">
+  <script src="{{ url_for('static', filename='js/app.js') }}" defer></script>
+</head>
+<body>
+  <a href="#main-content" class="fixed left-4 top-4 z-[100] -translate-y-24 bg-white px-4 py-3 text-sm font-semibold text-black transition-transform focus:translate-y-0">Skip to content</a>
+
+  <div class="announcement-ticker h-9 overflow-hidden bg-black text-white" aria-label="Store announcements">
+    <div class="announcement-ticker-track">
+      <div class="announcement-ticker-group">
+        <span>{{ homepage_settings.get('announcement_1', 'Free shipping on orders over $50') }}</span>
+        <span class="announcement-separator" aria-hidden="true">•</span>
+        <span>{{ homepage_settings.get('announcement_2', 'Small-batch care, rooted in nature') }}</span>
+        <span class="announcement-separator" aria-hidden="true">•</span>
+        <span>{{ homepage_settings.get('announcement_3', 'New arrivals every month — Shop now') }}</span>
+        <span class="announcement-separator" aria-hidden="true">•</span>
+      </div>
+      <div class="announcement-ticker-group" aria-hidden="true">
+        <span>{{ homepage_settings.get('announcement_1', 'Free shipping on orders over $50') }}</span>
+        <span class="announcement-separator">•</span>
+        <span>{{ homepage_settings.get('announcement_2', 'Small-batch care, rooted in nature') }}</span>
+        <span class="announcement-separator">•</span>
+        <span>{{ homepage_settings.get('announcement_3', 'New arrivals every month — Shop now') }}</span>
+        <span class="announcement-separator">•</span>
+      </div>
+    </div>
+  </div>
+
+  <header class="sticky top-0 z-50 border-b border-neutral-200 bg-white">
+    <div class="page-shell grid min-h-20 grid-cols-[1fr_auto] items-center gap-4 py-3 lg:grid-cols-[16rem_1fr_16rem]">
+      <div class="flex items-center gap-2">
+        <button type="button" data-menu-open aria-label="Open menu" class="icon-button lg:hidden">{{ icon("menu") }}</button>
+        <a href="{{ url_for('home') }}" class="flex flex-col" title="{{ site_name }} home">
+          <span class="font-display text-3xl font-semibold leading-none tracking-[-0.03em]">{{ site_name }}</span>
+          <span class="mt-1 text-[0.5rem] font-semibold uppercase tracking-[0.32em]">{{ site_settings.get('tagline', 'Body · Mind · Soul') }}</span>
+        </a>
+      </div>
+
+      <form action="{{ url_for('shop') }}" method="get" class="order-3 col-span-2 mx-auto flex min-h-11 w-full max-w-2xl items-center rounded-full border border-neutral-300 bg-neutral-50 px-4 lg:order-none lg:col-span-1">
+        {{ icon("search", "size-5 shrink-0") }}
+        <label for="header-search" class="sr-only">Search Aluyè Naturals</label>
+        <input id="header-search" name="q" type="search" class="min-w-0 flex-1 bg-transparent px-3 text-sm placeholder:text-neutral-500" placeholder="Search products, ingredients and rituals">
+      </form>
+
+      <div class="flex flex-col items-end">
+        <div class="flex items-center justify-end">
+          <a href="{{ url_for('contact') }}" class="hidden min-h-11 items-center px-3 text-xs font-semibold lg:flex">Stores & services</a>
+          <a href="#" class="icon-button hidden sm:inline-flex" aria-label="Your account">{{ icon("user") }}</a>
+          <a href="#" class="icon-button hidden sm:inline-flex" aria-label="Wishlist">{{ icon("heart") }}</a>
+          <a href="{{ url_for('cart') }}" class="icon-button relative" aria-label="Shopping bag with {{ cart_count }} items">
+            {{ icon("bag") }}
+            <span data-cart-count {% if not cart_count %}hidden{% endif %} class="absolute right-0 top-0 flex size-5 items-center justify-center rounded-full bg-ink text-[0.625rem] font-bold text-white">{{ cart_count }}</span>
+          </a>
+        </div>
+        <p class="hidden text-[0.65rem] font-semibold text-bark sm:block">
+          {% if cart_count and shipping_remaining %}
+            Add <span data-money data-price="{{ shipping_remaining }}">${{ shipping_remaining }}</span> more for free shipping
+          {% elif cart_count %}
+            Free shipping unlocked
+          {% else %}
+            Free shipping over <span data-money data-price="{{ free_shipping_threshold }}">${{ free_shipping_threshold }}</span>
+          {% endif %}
+        </p>
+      </div>
+    </div>
+
+    <nav aria-label="Primary navigation" class="hidden border-t border-neutral-200 lg:block">
+      <div class="page-shell flex items-center justify-center gap-8">
+        <a href="{{ url_for('home') }}" class="nav-link">Home</a>
+        <a href="{{ url_for('about') }}" class="nav-link">About</a>
+        <div class="group relative">
+          <a href="{{ url_for('shop') }}" class="nav-link inline-flex items-center gap-1">Shop <span class="text-[0.6rem]">▼</span></a>
+          <div class="invisible absolute left-1/2 top-full w-[48rem] -translate-x-1/2 border border-neutral-200 bg-white p-8 opacity-0 shadow-2xl transition group-hover:visible group-hover:opacity-100 group-focus-within:visible group-focus-within:opacity-100">
+            <div class="grid grid-cols-3 gap-8">
+              <div>
+                <p class="text-xs font-bold uppercase tracking-wider">Shop by category</p>
+                <div class="mt-4 grid gap-3 text-sm">
+                  {% for category in ["Skin Care", "Oil", "Men", "Hair", "Beards", "African Black Soap"] %}
+                    <a href="{{ url_for('shop', category=category) }}" class="hover:underline">{{ category }}</a>
+                  {% endfor %}
+                </div>
+              </div>
+              <div>
+                <p class="text-xs font-bold uppercase tracking-wider">Featured</p>
+                <div class="mt-4 grid gap-3 text-sm">
+                  <a href="{{ url_for('shop', q='shea') }}" class="hover:underline">Shea butter favourites</a>
+                  <a href="{{ url_for('shop', q='charcoal') }}" class="hover:underline">Charcoal cleansing</a>
+                  <a href="{{ url_for('shop', q='gift') }}" class="hover:underline">Gifts & sets</a>
+                </div>
+              </div>
+              <a href="{{ url_for('shop', category='Men') }}" class="bg-ink p-6 text-white">
+                <p class="eyebrow text-shea">Men’s grooming</p>
+                <p class="mt-4 font-display text-3xl font-semibold">The complete beard ritual.</p>
+                <span class="mt-6 inline-flex items-center gap-2 text-sm font-semibold">Shop now {{ icon("arrow", "size-4") }}</span>
+              </a>
+            </div>
+          </div>
+        </div>
+        <a href="{{ url_for('blog') }}" class="nav-link">Blog</a>
+        <a href="{{ url_for('contact') }}" class="nav-link">Contact</a>
+        <a href="{{ url_for('shop', category='Skin Care') }}" class="nav-link">Skin Care</a>
+        <a href="{{ url_for('shop', category='Oil') }}" class="nav-link">Oils</a>
+        <a href="{{ url_for('shop', category='Men') }}" class="nav-link">Men</a>
+        <a href="{{ url_for('shop', category='African Black Soap') }}" class="nav-link">Black Soap</a>
+      </div>
+    </nav>
+  </header>
+
+  {% if breadcrumbs %}
+    <nav aria-label="Breadcrumb" class="border-b border-sand bg-cream">
+      <ol class="page-shell flex min-h-10 flex-wrap items-center gap-2 py-2 text-xs text-bark">
+        {% for crumb in breadcrumbs %}
+          <li class="flex items-center gap-2">
+            {% if crumb.url %}<a href="{{ crumb.url }}" class="hover:text-ink hover:underline">{{ crumb.label }}</a>{% else %}<span aria-current="page">{{ crumb.label }}</span>{% endif %}
+            {% if not loop.last %}<span aria-hidden="true">/</span>{% endif %}
+          </li>
+        {% endfor %}
+      </ol>
+    </nav>
+  {% endif %}
+
+  <div id="mobile-menu" hidden class="fixed inset-0 z-[80] bg-white opacity-0 transition-opacity duration-200">
+    <div class="flex h-full flex-col">
+      <div class="flex min-h-20 items-center justify-between border-b border-neutral-200 px-4">
+        <span class="font-display text-3xl font-semibold">Aluyè Naturals</span>
+        <button type="button" data-menu-close class="icon-button" aria-label="Close menu">{{ icon("close") }}</button>
+      </div>
+      <nav class="flex flex-1 flex-col overflow-y-auto px-5 py-5" aria-label="Mobile navigation">
+        {% for label, endpoint in [("Home", "home"), ("About", "about"), ("Shop", "shop"), ("Blog", "blog"), ("Contact", "contact")] %}
+          <a href="{{ url_for(endpoint) }}" class="flex min-h-14 items-center justify-between border-b border-neutral-200 text-lg font-semibold">{{ label }} {{ icon("arrow") }}</a>
+        {% endfor %}
+        <p class="eyebrow mt-8 text-neutral-500">Shop by category</p>
+        {% for category in ["Skin Care", "Oil", "Men", "Hair", "Beards", "African Black Soap"] %}
+          <a href="{{ url_for('shop', category=category) }}" class="flex min-h-12 items-center border-b border-neutral-100 text-sm font-semibold">{{ category }}</a>
+        {% endfor %}
+      </nav>
+    </div>
+  </div>
+
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}<div class="fixed right-4 top-28 z-[70] space-y-2" aria-live="polite">{% for category, message in messages %}<div class="max-w-sm border border-neutral-200 bg-white px-5 py-4 text-sm font-semibold shadow-xl {% if category == 'error' %}text-error{% else %}text-success{% endif %}">{{ message }}</div>{% endfor %}</div>{% endif %}
+  {% endwith %}
+
+  <main id="main-content">{% block content %}{% endblock %}</main>
+
+  <section id="loyalty" class="border-y border-sand bg-cream text-ink">
+    <div class="page-shell flex flex-col items-start justify-between gap-7 py-12 md:flex-row md:items-center md:py-16">
+      <div>
+        <p class="eyebrow text-clay">Rewards for your ritual</p>
+        <h2 class="mt-3 font-display text-4xl font-semibold md:text-5xl">Join the Aluyè Ritual Club</h2>
+        <p class="mt-4 max-w-2xl text-base leading-7 text-bark">Earn points with every purchase. Redeem for free products and exclusive offers.</p>
+      </div>
+      <a href="{{ url_for('loyalty') }}" class="btn-secondary shrink-0">Learn more<span class="sr-only"> about the Aluyè Ritual Club</span></a>
+    </div>
+  </section>
+
+  <footer class="bg-black text-white">
+    <div class="border-b border-white/20">
+      <div class="page-shell grid gap-8 py-10 md:grid-cols-[1fr_1.2fr] md:items-center">
+        <div><p class="text-sm font-bold uppercase tracking-wider">{{ homepage_settings.get('signup_heading', 'Get 15% off your first ritual') }}</p><p class="mt-2 text-sm text-white/65">{{ homepage_settings.get('signup_subheading', 'Join for product launches, ingredient guides and members-only offers.') }}</p></div>
+        <form id="newsletter-form" class="flex border-b border-white">
+          <label for="newsletter-email" class="sr-only">Email address</label>
+          <input id="newsletter-email" type="email" required autocomplete="email" class="min-h-12 min-w-0 flex-1 bg-transparent text-base text-white placeholder:text-white/50" placeholder="Email address">
+          <button class="min-h-12 px-5 text-sm font-bold uppercase tracking-wider">Sign up</button>
+        </form>
+        <p id="newsletter-status" aria-live="polite" class="text-sm text-shea md:col-start-2"></p>
+      </div>
+    </div>
+    <div class="page-shell grid gap-10 py-12 sm:grid-cols-2 lg:grid-cols-5">
+      <div>
+        <h2 class="font-display text-3xl font-semibold">{{ site_name }}</h2>
+        <p class="mt-4 text-sm leading-6 text-white/65">Natural skin, hair, body and beard care rooted in West African ingredients and everyday ritual.</p>
+        <address class="mt-5 text-sm not-italic leading-6 text-white/80">{{ site_settings.get('address', '22-141 Galloway Road\nScarborough, Ontario\nM1E 4X4')|replace('\n', '<br>')|safe }}</address>
+        {% if site_settings.get('contact_email') %}<a class="mt-3 block text-sm text-white/80 underline" href="mailto:{{ site_settings.contact_email }}">{{ site_settings.contact_email }}</a>{% endif %}
+        {% if site_settings.get('phone') %}<a class="mt-2 block text-sm text-white/80 underline" href="tel:{{ site_settings.phone }}">{{ site_settings.phone }}</a>{% endif %}
+      </div>
+      <div><h3 class="text-xs font-bold uppercase tracking-wider">Shop</h3><ul class="mt-5 space-y-3 text-sm text-white/70">{% for item in ["Skin Care", "Oil", "Men", "Hair", "Beards", "African Black Soap"] %}<li><a href="{{ url_for('shop', category=item) }}" class="hover:text-white">{{ item }}</a></li>{% endfor %}</ul></div>
+      <div><h3 class="text-xs font-bold uppercase tracking-wider">About Aluyè</h3><ul class="mt-5 space-y-3 text-sm text-white/70"><li><a href="{{ url_for('about') }}">Our Story</a></li><li><a href="{{ url_for('blog') }}">Journal</a></li><li><a href="{{ url_for('contact') }}">Contact</a></li><li><a href="{{ url_for('about') }}#ingredients">Ingredients</a></li></ul></div>
+      <div><h3 class="text-xs font-bold uppercase tracking-wider">Help</h3><ul class="mt-5 space-y-3 text-sm text-white/70"><li><a href="{{ url_for('contact') }}">Customer Care</a></li><li><a href="{{ url_for('cart') }}">Delivery & Returns</a></li><li><a href="{{ url_for('contact') }}">FAQs</a></li><li><a href="#">Accessibility</a></li></ul></div>
+      <div><h3 class="text-xs font-bold uppercase tracking-wider">Follow</h3><ul class="mt-5 space-y-3 text-sm text-white/70"><li><a href="#">Instagram</a></li><li><a href="#">TikTok</a></li><li><a href="#">Facebook</a></li><li><a href="#">Pinterest</a></li></ul></div>
+    </div>
+    <div class="border-t border-white/20">
+      <div class="page-shell flex flex-col gap-4 py-6 text-xs text-white/55 sm:flex-row sm:items-center sm:justify-between">
+        <p>© 2026 Aluyè Naturals. Body. Mind. Soul.</p>
+        <div class="flex flex-wrap items-center gap-5">
+          <a href="#">Privacy</a><a href="#">Terms</a><a href="#">Cookies</a>
+          <label for="currency-selector" class="sr-only">Currency and region</label>
+          <select id="currency-selector" data-currency-selector class="min-h-11 border border-white/30 bg-black px-3 text-xs text-white">
+            <option value="USD">United States / USD</option>
+            <option value="CAD">Canada / CAD</option>
+            <option value="GBP">United Kingdom / GBP</option>
+            <option value="NGN">Nigeria / NGN</option>
+          </select>
+        </div>
+      </div>
+    </div>
+  </footer>
+
+  <dialog id="quick-view-modal" class="m-auto w-[min(92vw,56rem)] max-w-none bg-transparent p-0 backdrop:bg-black/60">
+    <div class="relative grid max-h-[90vh] overflow-y-auto bg-cream shadow-2xl md:grid-cols-2">
+      <button type="button" data-quick-view-close class="icon-button absolute right-3 top-3 z-20 bg-white" aria-label="Close quick view">{{ icon("close") }}</button>
+      <div class="flex min-h-80 items-center justify-center bg-white p-8">
+        <img data-quick-view-image alt="" width="640" height="800" class="max-h-[32rem] w-full object-contain">
+      </div>
+      <div class="flex flex-col justify-center p-7 md:p-10">
+        <p data-quick-view-category class="eyebrow text-clay"></p>
+        <h2 data-quick-view-title class="mt-3 font-display text-4xl font-semibold leading-none md:text-5xl"></h2>
+        <div class="mt-4 flex items-center gap-3 text-sm">
+          <span class="flex text-kraft" aria-hidden="true">{% for _ in range(5) %}{{ icon("star", "size-4") }}{% endfor %}</span>
+          <span data-quick-view-rating></span>
+        </div>
+        <p data-quick-view-description class="mt-5 text-base leading-7 text-bark"></p>
+        <p class="mt-6 text-2xl font-semibold tabular-nums" data-quick-view-price data-money data-price="0">$0</p>
+        <form data-quick-view-form method="post" class="mt-7">
+          <input type="hidden" name="next" value="{{ request.full_path if request.query_string else request.path }}">
+          <button class="btn-primary w-full">Add to cart</button>
+        </form>
+        <a data-quick-view-link href="#" class="mt-4 text-center text-sm font-semibold underline">View full product details</a>
+      </div>
+    </div>
+  </dialog>
+</body>
+</html>

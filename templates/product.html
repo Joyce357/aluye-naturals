@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+{% from "macros.html" import icon, product_card %}
+
+{% block content %}
+<section class="page-shell py-8 md:py-12">
+  <div class="grid gap-10 lg:grid-cols-[1.15fr_0.85fr] lg:gap-16">
+    <div class="grid gap-3 sm:grid-cols-2">
+      <div class="aspect-[4/5] border border-sand bg-white sm:col-span-2">
+        <img src="{{ url_for('media', collection='products', filename=product.image) }}" alt="{{ product.name }} product packaging" width="640" height="800" class="h-full w-full object-contain p-8" fetchpriority="high">
+      </div>
+      <div class="aspect-square bg-sand/40 p-8">
+        <div class="flex h-full items-center justify-center border border-bark/20 text-center">
+          <div><p class="eyebrow text-bark">Texture</p><p class="mt-3 font-display text-3xl">Rich. Airy. Melting.</p></div>
+        </div>
+      </div>
+      <div class="aspect-square bg-botanical p-8 text-white">
+        <div class="flex h-full items-center justify-center border border-white/30 text-center">
+          <div><p class="eyebrow text-shea">Rooted in nature</p><p class="mt-3 font-display text-3xl">{{ product.ingredients[0] }}</p></div>
+        </div>
+      </div>
+    </div>
+
+    <div>
+      <div class="lg:sticky lg:top-36">
+        <p class="eyebrow text-clay">{{ product.category }}</p>
+        <h1 class="mt-3 font-display text-5xl font-semibold leading-none md:text-6xl">{{ product.name }}</h1>
+        <div class="mt-5 flex items-center gap-3 text-sm">
+          <span role="img" aria-label="{{ product.rating }} out of 5 stars" class="flex text-kraft">{% for _ in range(5) %}{{ icon("star", "size-4") }}{% endfor %}</span>
+          <span>{{ product.rating }} · {{ product.reviews }} reviews</span>
+        </div>
+        <p class="mt-6 text-lg leading-8 text-bark">{{ product.description }}</p>
+        <div class="mt-7 flex items-center justify-between border-y border-sand py-5">
+          <span class="text-sm text-bark">{{ product.size }}</span>
+          <span class="text-xl font-semibold tabular-nums" data-money data-price="{{ product.price }}">${{ product.price }}</span>
+        </div>
+
+        <form action="{{ url_for('cart_add', slug=product.slug) }}" method="post" class="mt-6">
+          <label for="quantity" class="text-sm font-semibold">Quantity</label>
+          <div class="mt-2 flex gap-3">
+            <select id="quantity" name="quantity" class="min-h-12 w-24 border border-sand bg-cream px-4">
+              {% for quantity in range(1, 6) %}<option>{{ quantity }}</option>{% endfor %}
+            </select>
+            <button name="next" value="{{ url_for('cart') }}" class="btn-primary flex-1">Add to cart · <span class="ml-1" data-money data-price="{{ product.price }}">${{ product.price }}</span></button>
+          </div>
+          <button name="next" value="{{ url_for('checkout') }}" class="mt-3 min-h-12 w-full border border-black bg-white text-sm font-bold text-black hover:bg-neutral-100">Shop now</button>
+        </form>
+        <button type="button" data-wishlist aria-pressed="false" class="mt-3 inline-flex min-h-12 w-full items-center justify-center gap-2 border border-ink text-sm font-semibold">{{ icon("heart") }} Add to wishlist</button>
+
+        <div class="mt-8 divide-y divide-sand border-y border-sand">
+          {% for title, content in [("Best for", product.best_for), ("How to use", product.how_to), ("Key ingredients", product.ingredients|join(", "))] %}
+            <details class="group py-5" {% if loop.first %}open{% endif %}>
+              <summary class="flex cursor-pointer list-none items-center justify-between font-semibold">{{ title }} <span class="text-xl group-open:rotate-45">+</span></summary>
+              <p class="pt-4 text-sm leading-6 text-bark">{{ content }}</p>
+            </details>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="bg-cream py-16 md:py-24">
+  <div class="page-shell">
+    <p class="eyebrow text-bark">Complete the ritual</p>
+    <h2 class="section-heading mt-3">Pair it with</h2>
+    <div class="mt-8 grid grid-cols-2 gap-4 lg:grid-cols-3 lg:gap-6">
+      {% for item in related %}{{ product_card(item) }}{% endfor %}
+    </div>
+  </div>
+</section>
+{% endblock %}

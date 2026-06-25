@@ -1,0 +1,155 @@
+@import "tailwindcss";
+@source "../../templates/**/*.html";
+@source "../js/**/*.js";
+
+@theme {
+  --color-ink: #17130f;
+  --color-charcoal: #2a2520;
+  --color-bark: #594a3b;
+  --color-kraft: #b58a55;
+  --color-shea: #d4a85f;
+  --color-clay: #a8563a;
+  --color-botanical: #365c45;
+  --color-sage: #a7b39c;
+  --color-bone: #f6f1e8;
+  --color-cream: #fcfaf6;
+  --color-sand: #e7d8c3;
+  --color-error: #a62c2c;
+  --color-success: #2f6b45;
+  --font-display: "Cormorant Garamond", Georgia, serif;
+  --font-sans: "Inter", Arial, sans-serif;
+  --breakpoint-2xl: 90rem;
+  --ease-brand: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@layer base {
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    @apply bg-bone font-sans text-ink antialiased;
+  }
+
+  button,
+  a,
+  input,
+  select {
+    @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-shea focus-visible:ring-offset-2;
+  }
+
+  button,
+  [role="button"] {
+    @apply cursor-pointer;
+  }
+
+  ::selection {
+    @apply bg-shea text-ink;
+  }
+}
+
+@layer components {
+  .page-shell {
+    @apply mx-auto w-full max-w-[90rem] px-4 sm:px-6 lg:px-8 xl:px-12;
+  }
+
+  .eyebrow {
+    @apply text-[0.6875rem] font-semibold uppercase tracking-[0.18em];
+  }
+
+  .display-heading {
+    @apply font-display text-5xl font-semibold leading-[0.94] tracking-[-0.025em] md:text-7xl xl:text-[5.25rem];
+  }
+
+  .section-heading {
+    @apply font-display text-4xl font-semibold leading-none tracking-[-0.02em] md:text-5xl;
+  }
+
+  .btn-primary {
+    @apply inline-flex min-h-12 items-center justify-center bg-ink px-6 py-3 text-sm font-semibold text-white transition-colors duration-200 hover:bg-charcoal;
+  }
+
+  .btn-secondary {
+    @apply inline-flex min-h-12 items-center justify-center border border-ink px-6 py-3 text-sm font-semibold text-ink transition-colors duration-200 hover:bg-ink hover:text-white;
+  }
+
+  .icon-button {
+    @apply inline-flex size-11 shrink-0 items-center justify-center text-ink transition-colors duration-200 hover:bg-bone;
+  }
+
+  .product-card:hover .product-image,
+  .product-card:focus-within .product-image {
+    transform: scale(1.025);
+  }
+
+  .product-card:hover .quick-add,
+  .product-card:focus-within .quick-add {
+    @apply translate-y-0 opacity-100;
+  }
+
+  .nav-link {
+    @apply relative py-4 text-xs font-semibold uppercase tracking-[0.08em] after:absolute after:inset-x-0 after:bottom-3 after:h-px after:origin-left after:scale-x-0 after:bg-ink after:transition-transform hover:after:scale-x-100;
+  }
+
+  .announcement-ticker {
+    display: flex;
+    align-items: center;
+  }
+
+  .announcement-ticker-track {
+    display: flex;
+    width: max-content;
+    min-width: max-content;
+    animation: announcement-ticker 30s linear infinite;
+    will-change: transform;
+  }
+
+  .announcement-ticker-group {
+    display: flex;
+    min-width: max-content;
+    flex-shrink: 0;
+    align-items: center;
+    white-space: nowrap;
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+  }
+
+  .announcement-separator {
+    padding-inline: 2rem;
+  }
+}
+
+@keyframes announcement-ticker {
+  from {
+    transform: translateX(0);
+  }
+
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+
+  .announcement-ticker {
+    justify-content: center;
+  }
+
+  .announcement-ticker-track {
+    animation: none !important;
+    transform: none !important;
+  }
+
+  .announcement-ticker-group[aria-hidden="true"] {
+    display: none;
+  }
+}
