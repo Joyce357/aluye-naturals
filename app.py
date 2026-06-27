@@ -572,6 +572,27 @@ def create_app(test_config=None):
                 delivery = 0 if subtotal >= FREE_SHIPPING_THRESHOLD else 8
                 order_number = f"AN-{abs(hash((form['email'], subtotal))) % 900000 + 100000}"
                 save_order(order_number, form, items, subtotal + delivery)
+                try:
+                    if app.config.get("MAIL_USERNAME"):
+                        from flask_mail import Mail, Message as MailMessage
+                        mail = Mail(app)
+                        email_html = render_template(
+                            "emails/order_confirmation.html",
+                            order_number=order_number,
+                            customer_name=form.get("first_name", ""),
+                            items=items, subtotal=subtotal, delivery=delivery,
+                            total=subtotal + delivery,
+                            site_url=app.config["SITE_URL"],
+                            contact_email=load_setting("settings", {}).get("contact_email", ""),
+                        )
+                        mail.send(MailMessage(
+                            subject=f"Your Aluyè Naturals order is confirmed 🌿 (#{order_number})",
+                            sender=app.config["MAIL_DEFAULT_SENDER"],
+                            recipients=[form["email"]],
+                            html=email_html,
+                        ))
+                except Exception:
+                    pass
                 session.pop("cart", None)
                 return render_template(
                     "confirmation.html",
@@ -703,6 +724,95 @@ def create_app(test_config=None):
             products=PRODUCTS,
             seo=page_seo("Compare Products | Aluyè Naturals", "Compare Aluyè Naturals products side by side.", "/compare", robots="noindex,follow"),
         )
+
+    @app.route("/login", methods=["GET", "POST"])
+    def login():
+        from admin import get_db
+        from werkzeug.security import check_password_hash
+        if request.method == "POST":
+            email = request.form.get("email", "").strip()
+            password = request.form.get("password", "")
+            db = get_db()
+            user = db.execute("SELECT * FROM customers WHERE email=?", (email,)).fetchone()
+            if user and check_password_hash(user["password_hash"], password):
+                session["customer_id"] = user["id"]
+                session["customer_name"] = user["first_name"]
+                session["customer_email"] = user["email"]
+                flash(f"Welcome back, {user['first_name']}!", "success")
+                next_url = request.args.get("next", url_for("account"))
+                return redirect(next_url)
+            flash("Incorrect email or password.", "error")
+        return render_template("auth/login.html")
+
+    @app.route("/register", methods=["GET", "POST"])
+    def register():
+        from admin import get_db, add_notification
+        from werkzeug.security import generate_password_hash
+        if request.method == "POST":
+            first = request.form.get("first_name", "").strip()
+            last = request.form.get("last_name", "").strip()
+            email = request.form.get("email", "").strip()
+            pw = request.form.get("password", "")
+            pw2 = request.form.get("confirm_password", "")
+            if not all([first, last, email, pw]):
+                flash("Please complete all fields.", "error")
+            elif pw != pw2:
+                flash("Passwords do not match.", "error")
+            elif len(pw) < 8:
+                flash("Password must be at least 8 characters.", "error")
+            else:
+                db = get_db()
+                if db.execute("SELECT 1 FROM customers WHERE email=?", (email,)).fetchone():
+                    flash("An account with this email already exists.", "error")
+                else:
+                    db.execute(
+                        "INSERT INTO customers(first_name,last_name,email,password_hash,created_at) VALUES(?,?,?,?,?)",
+                        (first, last, email, generate_password_hash(pw),
+                         __import__("datetime").datetime.now().isoformat(timespec="minutes")),
+                    )
+                    db.commit()
+                    session["customer_id"] = db.execute("SELECT id FROM customers WHERE email=?", (email,)).fetchone()["id"]
+                    session["customer_name"] = first
+                    session["customer_email"] = email
+                    add_notification("customer", "New customer", f"{first} {last} ({email})")
+                    flash(f"Welcome to Aluyè, {first}! Check your email for your 15% off code.", "success")
+                    return redirect(url_for("account"))
+        return render_template("auth/register.html")
+
+    @app.get("/logout")
+    def logout():
+        session.pop("customer_id", None)
+        session.pop("customer_name", None)
+        session.pop("customer_email", None)
+        flash("Signed out.", "success")
+        return redirect(url_for("home"))
+
+    @app.get("/account")
+    def account():
+        if not session.get("customer_id"):
+            return redirect(url_for("login", next=request.path))
+        from admin import get_db
+        orders = get_db().execute(
+            "SELECT * FROM orders WHERE email=? ORDER BY created_at DESC",
+            (session.get("customer_email", ""),)
+        ).fetchall()
+        return render_template("auth/account.html", orders=orders, products=PRODUCTS,
+            seo=page_seo("My Account | Aluyè Naturals", "Manage your Aluyè Naturals account.", "/account", robots="noindex"))
+
+    @app.get("/privacy-policy")
+    def privacy_policy():
+        return render_template("legal/privacy.html",
+            seo=page_seo("Privacy Policy | Aluyè Naturals", "How Aluyè Naturals handles your data.", "/privacy-policy"))
+
+    @app.get("/terms-of-service")
+    def terms():
+        return render_template("legal/terms.html",
+            seo=page_seo("Terms of Service | Aluyè Naturals", "Terms and conditions for Aluyè Naturals.", "/terms-of-service"))
+
+    @app.get("/gift-cards")
+    def gift_cards():
+        return render_template("gift_cards.html", products=PRODUCTS,
+            seo=page_seo("Gift Cards | Aluyè Naturals", "Give the gift of natural care.", "/gift-cards"))
 
     @app.get("/quiz")
     def quiz():

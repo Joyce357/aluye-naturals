@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+{% from "macros.html" import icon %}
+{% block content %}
+<section class="page-shell py-12 md:py-16">
+  <div class="flex items-end justify-between border-b border-sand pb-6">
+    <div>
+      <p class="eyebrow text-bark">Your account</p>
+      <h1 class="mt-3 font-display text-5xl font-semibold md:text-6xl">Welcome back, {{ session.get('customer_name', 'there') }}</h1>
+    </div>
+    <a href="{{ url_for('logout') }}" class="text-sm font-semibold underline">Sign out</a>
+  </div>
+
+  <div class="mt-10 grid gap-8 md:grid-cols-2">
+    <div class="border border-sand bg-white p-6">
+      <h2 class="font-display text-2xl font-semibold">My Orders</h2>
+      {% if orders %}
+        <div class="mt-4 divide-y divide-sand">
+          {% for order in orders[:5] %}
+          <div class="flex items-center justify-between py-4">
+            <div>
+              <p class="font-semibold">{{ order.order_number }}</p>
+              <p class="text-xs text-bark">{{ order.created_at[:10] }}</p>
+            </div>
+            <div class="text-right">
+              <p class="text-sm font-semibold" data-money data-price="{{ order.total }}">${{ order.total }}</p>
+              <span class="text-xs font-bold uppercase {% if order.status == 'Delivered' %}text-success{% elif order.status == 'Cancelled' %}text-error{% else %}text-bark{% endif %}">{{ order.status }}</span>
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+      {% else %}
+        <p class="mt-4 text-sm text-bark">No orders yet. <a href="{{ url_for('shop') }}" class="font-semibold underline">Start shopping</a></p>
+      {% endif %}
+    </div>
+
+    <div class="border border-sand bg-white p-6">
+      <h2 class="font-display text-2xl font-semibold">My Wishlist</h2>
+      <p class="mt-4 text-sm text-bark">Your saved products are stored locally. <a href="{{ url_for('wishlist_page') }}" class="font-semibold underline">View wishlist</a></p>
+    </div>
+
+    <div class="border border-sand bg-white p-6">
+      <h2 class="font-display text-2xl font-semibold">My Details</h2>
+      <div class="mt-4 space-y-2 text-sm">
+        <p><strong>Name:</strong> {{ session.get('customer_name', '') }}</p>
+        <p><strong>Email:</strong> {{ session.get('customer_email', '') }}</p>
+      </div>
+    </div>
+
+    <div class="border border-sand bg-white p-6">
+      <h2 class="font-display text-2xl font-semibold">Quick Links</h2>
+      <div class="mt-4 space-y-3">
+        <a href="{{ url_for('track_order') }}" class="block text-sm font-semibold underline">Track an Order</a>
+        <a href="{{ url_for('returns') }}" class="block text-sm font-semibold underline">Returns & Refunds</a>
+        <a href="{{ url_for('contact') }}" class="block text-sm font-semibold underline">Contact Us</a>
+      </div>
+    </div>
+  </div>
+</section>
+{% endblock %}

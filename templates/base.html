@@ -245,7 +245,7 @@
       </details>
       <details class="footer-accordion">
         <summary>Help</summary>
-        <div class="footer-links"><h3 class="hidden text-xs font-bold uppercase tracking-wider md:block">Help</h3><ul class="space-y-3 text-sm text-white/70 md:mt-5"><li><a href="{{ url_for('contact') }}" class="inline-block min-h-[44px] leading-[44px]">Customer Care</a></li><li><a href="{{ url_for('track_order') }}" class="inline-block min-h-[44px] leading-[44px]">Track Your Order</a></li><li><a href="{{ url_for('returns') }}" class="inline-block min-h-[44px] leading-[44px]">Returns & Refunds</a></li><li><a href="{{ url_for('contact') }}" class="inline-block min-h-[44px] leading-[44px]">FAQs</a></li></ul></div>
+        <div class="footer-links"><h3 class="hidden text-xs font-bold uppercase tracking-wider md:block">Help</h3><ul class="space-y-3 text-sm text-white/70 md:mt-5"><li><a href="{{ url_for('contact') }}" class="inline-block min-h-[44px] leading-[44px]">Customer Care</a></li><li><a href="{{ url_for('track_order') }}" class="inline-block min-h-[44px] leading-[44px]">Track Your Order</a></li><li><a href="{{ url_for('returns') }}" class="inline-block min-h-[44px] leading-[44px]">Returns & Refunds</a></li><li><a href="{{ url_for('gift_cards') }}" class="inline-block min-h-[44px] leading-[44px]">Gift Cards</a></li></ul></div>
       </details>
       <details class="footer-accordion">
         <summary>Follow</summary>
@@ -256,7 +256,7 @@
       <div class="page-shell flex flex-col gap-4 py-6 text-xs text-white/55 sm:flex-row sm:items-center sm:justify-between">
         <p>© 2026 Aluyè Naturals. Body. Mind. Soul.</p>
         <div class="flex flex-wrap items-center gap-5">
-          <a href="#">Privacy</a><a href="#">Terms</a><a href="#">Cookies</a>
+          <a href="{{ url_for('privacy_policy') }}">Privacy</a><a href="{{ url_for('terms') }}">Terms</a><a href="#">Cookies</a>
           <label for="currency-selector" class="sr-only">Currency and region</label>
           <select id="currency-selector" data-currency-selector class="min-h-11 border border-white/30 bg-black px-3 text-xs text-white">
             <option value="USD">United States / USD</option>
@@ -381,6 +381,22 @@
       </div>
     </div>
   </dialog>
+  {# Priority 5: Cookie Consent Banner #}
+  <div id="cookie-banner" hidden class="fixed inset-x-0 bottom-[4.5rem] z-[55] border-t border-sand bg-cream px-4 py-4 shadow-lg md:bottom-0">
+    <div class="page-shell flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+      <p class="text-sm text-bark">We use cookies to improve your experience, personalise content and analyse traffic. By clicking Accept All you consent to our use of cookies. <a href="{{ url_for('privacy_policy') }}" class="font-semibold underline">Privacy Policy</a></p>
+      <div class="flex gap-3 shrink-0">
+        <button id="cookie-accept" class="btn-primary whitespace-nowrap px-5 text-xs">Accept All</button>
+        <button id="cookie-decline" class="btn-secondary whitespace-nowrap px-5 text-xs">Decline</button>
+      </div>
+    </div>
+  </div>
+  <script>
+    if(!localStorage.getItem("aluye_cookie_consent")){document.querySelector("#cookie-banner").hidden=false}
+    document.querySelector("#cookie-accept")?.addEventListener("click",()=>{localStorage.setItem("aluye_cookie_consent","accepted");document.querySelector("#cookie-banner").hidden=true});
+    document.querySelector("#cookie-decline")?.addEventListener("click",()=>{localStorage.setItem("aluye_cookie_consent","declined");document.querySelector("#cookie-banner").hidden=true});
+  </script>
+
   <script>if("serviceWorker"in navigator){navigator.serviceWorker.register("/sw.js")}</script>
 </body>
 </html>

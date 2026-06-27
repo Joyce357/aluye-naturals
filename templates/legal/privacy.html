@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="page-shell py-12 md:py-16">
+  <div class="mx-auto max-w-3xl">
+    <p class="eyebrow text-bark">Legal</p>
+    <h1 class="mt-3 font-display text-5xl font-semibold leading-none md:text-6xl">Privacy Policy</h1>
+    <p class="mt-4 text-sm text-bark">Last updated: June 2026</p>
+
+    <div class="mt-10 space-y-8 text-sm leading-7 text-bark">
+      <div>
+        <h2 class="text-lg font-semibold text-ink">1. Introduction</h2>
+        <p class="mt-3">Aluyè Naturals ("we", "our", "us") is committed to protecting your privacy. This policy explains how we collect, use and protect your personal information when you visit our website or place an order.</p>
+      </div>
+      <div>
+        <h2 class="text-lg font-semibold text-ink">2. Information We Collect</h2>
+        <p class="mt-3">We collect information you provide directly: name, email address, shipping address, phone number and payment details when you place an order. We also collect browsing data through cookies including pages visited, products viewed and device information.</p>
+      </div>
+      <div>
+        <h2 class="text-lg font-semibold text-ink">3. How We Use Your Information</h2>
+        <p class="mt-3">We use your information to process and fulfil orders, send order confirmations and shipping updates, respond to your enquiries, improve our products and website, and send marketing communications if you have opted in.</p>
+      </div>
+      <div>
+        <h2 class="text-lg font-semibold text-ink">4. Cookies</h2>
+        <p class="mt-3">We use essential cookies to keep your shopping cart and session active. With your consent, we may also use analytics cookies (Google Analytics) to understand how visitors use our site, and marketing cookies (Facebook Pixel) to show you relevant advertisements.</p>
+      </div>
+      <div>
+        <h2 class="text-lg font-semibold text-ink">5. Sharing Your Information</h2>
+        <p class="mt-3">We share your information only with trusted third parties necessary to run our business: payment processors (Stripe, Paystack, Flutterwave), shipping carriers, and email service providers. We never sell your personal data.</p>
+      </div>
+      <div>
+        <h2 class="text-lg font-semibold text-ink">6. Your Rights</h2>
+        <p class="mt-3">You have the right to access, correct or delete your personal information. You can unsubscribe from marketing emails at any time. To exercise these rights, contact us using the details below.</p>
+      </div>
+      <div>
+        <h2 class="text-lg font-semibold text-ink">7. Contact Us</h2>
+        <p class="mt-3">For privacy-related enquiries, please email us at {{ site_settings.get('contact_email', 'hello@aluyenaturals.com') }} or visit our <a href="{{ url_for('contact') }}" class="font-semibold underline">contact page</a>.</p>
+      </div>
+    </div>
+  </div>
+</section>
+{% endblock %}

@@ -190,6 +190,22 @@ def init_db():
           updated_at TEXT NOT NULL,
           FOREIGN KEY(message_id) REFERENCES messages(id)
         );
+        CREATE TABLE IF NOT EXISTS customers (
+          id INTEGER PRIMARY KEY AUTOINCREMENT, first_name TEXT NOT NULL,
+          last_name TEXT NOT NULL, email TEXT UNIQUE NOT NULL,
+          password_hash TEXT NOT NULL, phone TEXT DEFAULT '',
+          address TEXT DEFAULT '', city TEXT DEFAULT '',
+          state TEXT DEFAULT '', postal_code TEXT DEFAULT '',
+          country TEXT DEFAULT '', created_at TEXT NOT NULL
+        );
+        CREATE TABLE IF NOT EXISTS gift_cards (
+          id INTEGER PRIMARY KEY AUTOINCREMENT, code TEXT UNIQUE NOT NULL,
+          original_value REAL NOT NULL, remaining REAL NOT NULL,
+          from_name TEXT DEFAULT '', to_name TEXT DEFAULT '',
+          to_email TEXT DEFAULT '', message TEXT DEFAULT '',
+          status TEXT NOT NULL DEFAULT 'active',
+          created_at TEXT NOT NULL, expires_at TEXT NOT NULL
+        );
         """
     )
     if not db.execute("SELECT 1 FROM admin_users LIMIT 1").fetchone():

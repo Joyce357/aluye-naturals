@@ -2,6 +2,15 @@
 
 {% block content %}
 <section class="page-shell py-10 md:py-14">
+  {# Progress Bar #}
+  <div class="mb-8 flex items-center justify-center gap-2 text-xs font-semibold">
+    <a href="{{ url_for('cart') }}" class="text-bark hover:underline">Cart</a>
+    <span class="text-bark">→</span>
+    <span class="text-ink">Information & Shipping</span>
+    <span class="text-bark">→</span>
+    <span class="text-bark">Payment</span>
+  </div>
+
   <div class="mb-8 flex items-center justify-between border-b border-sand pb-5">
     <div><p class="eyebrow text-bark">Secure checkout</p><h1 class="mt-2 font-display text-5xl font-semibold">Complete your order</h1></div>
     <a href="{{ url_for('cart') }}" class="text-sm font-semibold underline">Back to bag</a>
@@ -17,11 +26,18 @@
     <div class="space-y-10">
       <fieldset>
         <legend class="font-display text-3xl font-semibold">Contact</legend>
+        {% if not session.get('customer_id') %}
+        <p class="mt-2 text-sm text-bark">Already have an account? <a href="{{ url_for('login', next=url_for('checkout')) }}" class="font-semibold underline">Sign in</a></p>
+        {% endif %}
         <div class="mt-5">
           <label for="email" class="text-sm font-semibold">Email address</label>
-          <input id="email" name="email" type="email" autocomplete="email" value="{{ form.get('email', '') }}" class="mt-2 min-h-12 w-full border bg-cream px-4 {% if errors.email %}border-error{% else %}border-sand{% endif %}" {% if errors.email %}aria-describedby="email-error"{% endif %}>
-          {% if errors.email %}<p id="email-error" class="mt-2 text-sm text-error">{{ errors.email }}</p>{% endif %}
+          <input id="email" name="email" type="email" autocomplete="email" value="{{ form.get('email', session.get('customer_email', '')) }}" class="mt-2 min-h-12 w-full border bg-cream px-4 {% if errors.email %}border-error{% else %}border-sand{% endif %}">
+          {% if errors.email %}<p class="mt-2 text-sm text-error">{{ errors.email }}</p>{% endif %}
         </div>
+        <label class="mt-3 flex items-center gap-3 text-sm">
+          <input type="checkbox" name="subscribe" class="size-4 accent-ink">
+          Keep me updated on new products and offers
+        </label>
       </fieldset>
 
       <fieldset>
@@ -31,22 +47,44 @@
             ("first_name", "First name", "given-name"), ("last_name", "Last name", "family-name"),
             ("address", "Address", "street-address"), ("apartment", "Apartment, suite, etc. (optional)", "address-line2"),
             ("city", "City", "address-level2"), ("postal_code", "Postal code", "postal-code"),
-            ("country", "Country", "country-name")
+            ("country", "Country", "country-name"), ("phone", "Phone number", "tel")
           ] %}
           <div {% if field in ["address", "apartment"] %}class="sm:col-span-2"{% endif %}>
             <label for="{{ field }}" class="text-sm font-semibold">{{ label }}</label>
-            <input id="{{ field }}" name="{{ field }}" autocomplete="{{ autocomplete }}" value="{{ form.get(field, '') }}" class="mt-2 min-h-12 w-full border bg-cream px-4 {% if errors.get(field) %}border-error{% else %}border-sand{% endif %}" {% if errors.get(field) %}aria-describedby="{{ field }}-error"{% endif %}>
-            {% if errors.get(field) %}<p id="{{ field }}-error" class="mt-2 text-sm text-error">{{ errors[field] }}</p>{% endif %}
+            <input id="{{ field }}" name="{{ field }}" autocomplete="{{ autocomplete }}" value="{{ form.get(field, '') }}" class="mt-2 min-h-12 w-full border bg-cream px-4 {% if errors.get(field) %}border-error{% else %}border-sand{% endif %}">
+            {% if errors.get(field) %}<p class="mt-2 text-sm text-error">{{ errors[field] }}</p>{% endif %}
           </div>
           {% endfor %}
         </div>
       </fieldset>
 
       <fieldset>
+        <legend class="font-display text-3xl font-semibold">Shipping method</legend>
+        <div class="mt-5 space-y-3">
+          <label class="flex cursor-pointer items-center justify-between border border-sand bg-cream p-4 has-[:checked]:border-ink">
+            <div class="flex items-center gap-3">
+              <input type="radio" name="shipping_method" value="standard" checked class="size-4 accent-ink">
+              <div><p class="text-sm font-semibold">{% if delivery %}Standard Shipping{% else %}Free Shipping{% endif %}</p><p class="text-xs text-bark">3–7 business days</p></div>
+            </div>
+            <span class="text-sm font-semibold">{% if delivery %}<span data-money data-price="{{ delivery }}">${{ delivery }}</span>{% else %}Free{% endif %}</span>
+          </label>
+        </div>
+      </fieldset>
+
+      <fieldset>
         <legend class="font-display text-3xl font-semibold">Payment</legend>
-        <div class="mt-5 border border-sand bg-cream p-5">
-          <p class="font-semibold">Secure payment placeholder</p>
-          <p class="mt-2 text-sm leading-6 text-bark">Connect Stripe, PayPal, or another PCI-compliant provider before accepting live orders. Card details should never be stored directly by this Flask app.</p>
+        <div class="mt-5 space-y-4">
+          <div class="border border-sand bg-cream p-5">
+            <div class="flex items-center gap-2">
+              <span>🔒</span>
+              <p class="text-sm font-semibold">Secure payment</p>
+            </div>
+            <p class="mt-2 text-sm leading-6 text-bark">Your payment is processed securely. Card details are never stored on our servers.</p>
+          </div>
+          <label class="flex cursor-pointer items-center gap-3 border border-sand bg-cream p-4 has-[:checked]:border-ink">
+            <input type="radio" name="payment_method" value="bank_transfer" checked class="size-4 accent-ink">
+            <div><p class="text-sm font-semibold">Bank Transfer / Online Payment</p><p class="text-xs text-bark">Pay via bank transfer or online banking</p></div>
+          </label>
         </div>
       </fieldset>
     </div>
@@ -56,7 +94,7 @@
       <div class="mt-5 divide-y divide-sand">
         {% for item in items %}
           <div class="flex gap-3 py-4">
-            <img src="{{ url_for('media', collection='products', filename=item.product.image) }}" alt="" width="64" height="80" class="h-20 w-16 bg-white object-contain">
+            <img src="{{ url_for('media', collection='products', filename=item.product.image) }}" alt="" width="64" height="80" class="h-20 w-16 bg-white object-contain" loading="lazy">
             <div class="min-w-0 flex-1"><p class="text-sm font-semibold">{{ item.product.name }}</p><p class="mt-1 text-xs text-bark">Qty {{ item.quantity }}</p></div>
             <p class="text-sm font-semibold" data-money data-price="{{ item.line_total }}">${{ item.line_total }}</p>
           </div>
@@ -67,9 +105,8 @@
         <div class="flex justify-between"><dt>Delivery</dt><dd>{% if delivery %}<span data-money data-price="{{ delivery }}">${{ delivery }}</span>{% else %}Free{% endif %}</dd></div>
         <div class="flex justify-between border-t border-sand pt-4 text-base font-semibold"><dt>Total</dt><dd data-money data-price="{{ total }}">${{ total }}</dd></div>
       </dl>
-      {# Feature 7: Trust Badges #}
       <div class="mt-5 grid grid-cols-2 gap-2">
-        {% for badge_icon, badge_label in [("🔒", "Secure Checkout"), ("✅", "SSL Encrypted"), ("🔄", "Easy Returns"), ("🌿", "100% Natural")] %}
+        {% for badge_icon, badge_label in [("🔒", "Secure Checkout"), ("🌿", "100% Natural"), ("🔄", "Easy Returns"), ("📦", "Free over $50")] %}
           <div class="flex items-center gap-2 rounded bg-neutral-100 px-3 py-2">
             <span class="text-base">{{ badge_icon }}</span>
             <span class="text-[0.65rem] font-semibold text-bark">{{ badge_label }}</span>
@@ -77,7 +114,7 @@
         {% endfor %}
       </div>
       <button class="btn-primary mt-6 w-full">Place order</button>
-      <p class="mt-3 text-xs leading-5 text-bark">By placing your order, you agree to the store terms and privacy policy.</p>
+      <p class="mt-3 text-xs leading-5 text-bark">By placing your order, you agree to our <a href="{{ url_for('terms') }}" class="underline">Terms</a> and <a href="{{ url_for('privacy_policy') }}" class="underline">Privacy Policy</a>.</p>
     </aside>
   </form>
 </section>

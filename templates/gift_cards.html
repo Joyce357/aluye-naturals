@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="border-b border-sand bg-cream">
+  <div class="page-shell py-12 md:py-16 text-center">
+    <p class="eyebrow text-clay">The perfect present</p>
+    <h1 class="mt-3 font-display text-5xl font-semibold leading-none md:text-7xl">Give the Gift of Ritual</h1>
+    <p class="mt-5 mx-auto max-w-lg text-base leading-7 text-bark">Let someone special choose their own natural care favourites with an Aluyè Naturals digital gift card.</p>
+  </div>
+</section>
+
+<section class="page-shell py-12 md:py-16">
+  <div class="mx-auto max-w-xl">
+    <form method="post" class="space-y-6">
+      <div>
+        <label class="text-sm font-semibold">Select amount</label>
+        <div class="mt-3 grid grid-cols-4 gap-3">
+          {% for amount in [25, 50, 75, 100] %}
+          <label class="flex cursor-pointer items-center justify-center border border-sand bg-cream py-3 text-sm font-bold has-[:checked]:border-ink has-[:checked]:bg-ink has-[:checked]:text-white">
+            <input type="radio" name="amount" value="{{ amount }}" {% if loop.first %}checked{% endif %} class="sr-only">${{ amount }}
+          </label>
+          {% endfor %}
+        </div>
+      </div>
+      <div>
+        <label for="gc-to" class="text-sm font-semibold">Recipient name</label>
+        <input id="gc-to" name="to_name" required class="mt-2 min-h-12 w-full border border-sand bg-cream px-4">
+      </div>
+      <div>
+        <label for="gc-email" class="text-sm font-semibold">Recipient email</label>
+        <input id="gc-email" name="to_email" type="email" required class="mt-2 min-h-12 w-full border border-sand bg-cream px-4">
+      </div>
+      <div>
+        <label for="gc-from" class="text-sm font-semibold">Your name (from)</label>
+        <input id="gc-from" name="from_name" required class="mt-2 min-h-12 w-full border border-sand bg-cream px-4">
+      </div>
+      <div>
+        <label for="gc-msg" class="text-sm font-semibold">Personal message (optional)</label>
+        <textarea id="gc-msg" name="message" rows="3" class="mt-2 w-full border border-sand bg-cream p-4" placeholder="Enjoy your ritual..."></textarea>
+      </div>
+      <button class="btn-primary w-full">Purchase Gift Card</button>
+      <p class="text-center text-xs text-bark">Digital delivery — no shipping needed. Gift cards are valid for 12 months.</p>
+    </form>
+  </div>
+</section>
+{% endblock %}
