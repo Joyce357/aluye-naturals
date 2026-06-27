@@ -129,12 +129,16 @@ let drawerOpen = false;
 function openDrawer() {
   if (!drawer) return;
   drawerOpen = true;
-  drawer.hidden = false;
-  drawerOverlay.hidden = false;
+  drawer.removeAttribute("hidden");
+  drawerOverlay.removeAttribute("hidden");
+  drawer.style.display = "flex";
+  drawerOverlay.style.display = "block";
   body.classList.add("overflow-hidden");
   requestAnimationFrame(() => {
-    drawer.classList.remove("translate-x-full");
-    drawerOverlay.classList.remove("opacity-0");
+    requestAnimationFrame(() => {
+      drawer.classList.remove("translate-x-full");
+      drawerOverlay.classList.remove("opacity-0");
+    });
   });
   refreshDrawer();
 }
@@ -145,8 +149,10 @@ function closeDrawer() {
   drawer.classList.add("translate-x-full");
   drawerOverlay.classList.add("opacity-0");
   setTimeout(() => {
-    drawer.hidden = true;
-    drawerOverlay.hidden = true;
+    drawer.style.display = "";
+    drawerOverlay.style.display = "";
+    drawer.setAttribute("hidden", "");
+    drawerOverlay.setAttribute("hidden", "");
     body.classList.remove("overflow-hidden");
   }, 300);
 }
