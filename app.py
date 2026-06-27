@@ -2,6 +2,9 @@ import gzip
 import os
 from pathlib import Path
 
+from dotenv import load_dotenv
+load_dotenv()
+
 from flask import (
     Flask,
     abort,
@@ -37,15 +40,18 @@ FREE_SHIPPING_THRESHOLD = 50
 
 def create_app(test_config=None):
     app = Flask(__name__)
+    mail_user = os.environ.get("MAIL_USERNAME", "")
     app.config.from_mapping(
         SECRET_KEY=os.environ.get("SECRET_KEY", "dev-change-me"),
         SITE_URL=os.environ.get("SITE_URL", "http://127.0.0.1:5000").rstrip("/"),
+        MAX_CONTENT_LENGTH=16 * 1024 * 1024,
         MAIL_SERVER=os.environ.get("MAIL_SERVER", "smtp.gmail.com"),
         MAIL_PORT=int(os.environ.get("MAIL_PORT", 587)),
         MAIL_USE_TLS=True,
-        MAIL_USERNAME=os.environ.get("MAIL_USERNAME", ""),
+        MAIL_USERNAME=mail_user,
         MAIL_PASSWORD=os.environ.get("MAIL_PASSWORD", ""),
-        MAIL_DEFAULT_SENDER=os.environ.get("MAIL_USERNAME", "noreply@aluyenaturals.com"),
+        MAIL_DEFAULT_SENDER=mail_user or "noreply@aluyenaturals.com",
+        MAIL_SUPPRESS_SEND=not mail_user,
     )
     if test_config:
         app.config.update(test_config)
@@ -922,6 +928,14 @@ def create_app(test_config=None):
                 }
             )
         return crumbs
+
+    @app.errorhandler(404)
+    def not_found(e):
+        return render_template("404.html", seo={"title": "Page Not Found | Aluyè Naturals", "description": "", "canonical_url": "", "image_url": "", "image_alt": "", "robots": "noindex"}), 404
+
+    @app.errorhandler(500)
+    def server_error(e):
+        return render_template("500.html", seo={"title": "Something Went Wrong | Aluyè Naturals", "description": "", "canonical_url": "", "image_url": "", "image_alt": "", "robots": "noindex"}), 500
 
     return app
 
