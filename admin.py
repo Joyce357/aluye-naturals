@@ -179,6 +179,17 @@ def init_db():
           id INTEGER PRIMARY KEY AUTOINCREMENT, skin_type TEXT, skin_concern TEXT,
           hair_concern TEXT, beard TEXT, budget TEXT, created_at TEXT NOT NULL
         );
+        CREATE TABLE IF NOT EXISTS message_replies (
+          id INTEGER PRIMARY KEY AUTOINCREMENT, message_id INTEGER NOT NULL,
+          reply_text TEXT NOT NULL, replied_by TEXT NOT NULL,
+          created_at TEXT NOT NULL,
+          FOREIGN KEY(message_id) REFERENCES messages(id)
+        );
+        CREATE TABLE IF NOT EXISTS message_drafts (
+          message_id INTEGER PRIMARY KEY, draft_text TEXT NOT NULL,
+          updated_at TEXT NOT NULL,
+          FOREIGN KEY(message_id) REFERENCES messages(id)
+        );
         """
     )
     if not db.execute("SELECT 1 FROM admin_users LIMIT 1").fetchone():
@@ -720,6 +731,112 @@ def messages():
         flash("Inbox updated.", "success")
     rows = db.execute("SELECT * FROM messages ORDER BY created_at DESC").fetchall()
     return render_template("admin/messages.html", admin_section="messages", messages=rows)
+
+
+@admin_bp.route("/messages/<int:message_id>", methods=["GET", "POST"])
+def message_detail(message_id):
+    db = get_db()
+    msg = db.execute("SELECT * FROM messages WHERE id=?", (message_id,)).fetchone()
+    if not msg:
+        flash("Message not found.", "error")
+        return redirect(url_for("admin.messages"))
+    if msg["status"] == "unread":
+        db.execute("UPDATE messages SET status='read' WHERE id=?", (message_id,))
+        db.commit()
+
+    if request.method == "POST":
+        action = request.form.get("action", "send")
+        reply_text = request.form.get("reply_text", "").strip()
+
+        if action == "discard_draft":
+            db.execute("DELETE FROM message_drafts WHERE message_id=?", (message_id,))
+            db.commit()
+            flash("Draft discarded.", "success")
+            return redirect(url_for("admin.message_detail", message_id=message_id))
+
+        if action == "save_draft" and reply_text:
+            db.execute(
+                """INSERT INTO message_drafts(message_id, draft_text, updated_at) VALUES(?,?,?)
+                   ON CONFLICT(message_id) DO UPDATE SET draft_text=excluded.draft_text, updated_at=excluded.updated_at""",
+                (message_id, reply_text, datetime.now().isoformat(timespec="minutes")),
+            )
+            db.commit()
+            flash("Draft saved.", "success")
+            return redirect(url_for("admin.message_detail", message_id=message_id))
+
+        if action == "send" and reply_text:
+            sent = False
+            try:
+                from flask_mail import Mail, Message as MailMessage
+                mail = Mail(current_app)
+                site_settings = load_setting("settings", {}) or {}
+                sender_email = site_settings.get("contact_email") or current_app.config.get("MAIL_USERNAME") or "noreply@aluyenaturals.com"
+                email_html = render_template(
+                    "emails/reply.html",
+                    reply_text=reply_text,
+                    customer_name=msg["name"],
+                    site_url=current_app.config.get("SITE_URL", ""),
+                )
+                email_msg = MailMessage(
+                    subject=f"Re: {msg['subject']}",
+                    sender=sender_email,
+                    recipients=[msg["email"]],
+                    html=email_html,
+                )
+                mail.send(email_msg)
+                sent = True
+            except Exception:
+                sent = False
+
+            db.execute(
+                "INSERT INTO message_replies(message_id, reply_text, replied_by, created_at) VALUES(?,?,?,?)",
+                (message_id, reply_text, session.get("admin_username", "admin"), datetime.now().isoformat(timespec="minutes")),
+            )
+            db.execute("UPDATE messages SET status='replied' WHERE id=?", (message_id,))
+            db.execute("DELETE FROM message_drafts WHERE message_id=?", (message_id,))
+            db.commit()
+            record_activity(f"Replied to message #{message_id}")
+            if sent:
+                flash(f"Reply sent to {msg['email']} ✓", "success")
+            else:
+                flash("Reply saved but email could not be sent. Check SMTP settings in .env.", "error")
+            return redirect(url_for("admin.message_detail", message_id=message_id))
+
+    replies = db.execute(
+        "SELECT * FROM message_replies WHERE message_id=? ORDER BY created_at", (message_id,)
+    ).fetchall()
+    draft = db.execute(
+        "SELECT * FROM message_drafts WHERE message_id=?", (message_id,)
+    ).fetchone()
+    return render_template(
+        "admin/message_detail.html",
+        admin_section="messages",
+        msg=msg,
+        replies=replies,
+        draft=draft,
+    )
+
+
+@admin_bp.route("/settings/test-email", methods=["POST"])
+def test_email():
+    try:
+        from flask_mail import Mail, Message as MailMessage
+        mail = Mail(current_app)
+        admin_email = current_app.config.get("MAIL_USERNAME", "")
+        if not admin_email:
+            flash("No MAIL_USERNAME configured in .env.", "error")
+        else:
+            email_msg = MailMessage(
+                subject="Aluyè Naturals — Test Email",
+                sender=admin_email,
+                recipients=[admin_email],
+                html="<p>This is a test email from your Aluyè Naturals admin panel. Email is configured correctly.</p>",
+            )
+            mail.send(email_msg)
+            flash(f"Test email sent to {admin_email} ✓", "success")
+    except Exception as e:
+        flash(f"Email failed: {str(e)}", "error")
+    return redirect(url_for("admin.configurable_section", section="settings"))
 
 
 @admin_bp.post("/notifications/read")
