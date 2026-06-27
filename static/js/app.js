@@ -129,17 +129,11 @@ let drawerOpen = false;
 function openDrawer() {
   if (!drawer) return;
   drawerOpen = true;
-  drawer.removeAttribute("hidden");
-  drawerOverlay.removeAttribute("hidden");
-  drawer.style.display = "flex";
-  drawerOverlay.style.display = "block";
+  drawer.classList.remove("pointer-events-none");
+  drawerOverlay.classList.remove("pointer-events-none");
   body.classList.add("overflow-hidden");
-  requestAnimationFrame(() => {
-    requestAnimationFrame(() => {
-      drawer.classList.remove("translate-x-full");
-      drawerOverlay.classList.remove("opacity-0");
-    });
-  });
+  drawer.classList.remove("translate-x-full");
+  drawerOverlay.classList.remove("opacity-0");
   refreshDrawer();
 }
 
@@ -149,10 +143,8 @@ function closeDrawer() {
   drawer.classList.add("translate-x-full");
   drawerOverlay.classList.add("opacity-0");
   setTimeout(() => {
-    drawer.style.display = "";
-    drawerOverlay.style.display = "";
-    drawer.setAttribute("hidden", "");
-    drawerOverlay.setAttribute("hidden", "");
+    drawer.classList.add("pointer-events-none");
+    drawerOverlay.classList.add("pointer-events-none");
     body.classList.remove("overflow-hidden");
   }, 300);
 }
