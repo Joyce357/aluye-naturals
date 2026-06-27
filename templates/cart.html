@@ -45,6 +45,27 @@
       {% endif %}
       <div class="mt-6 flex justify-between border-t border-sand pt-5"><span>Subtotal</span><strong class="tabular-nums" data-money data-price="{{ subtotal }}">${{ subtotal }}</strong></div>
       <p class="mt-2 text-xs text-bark">Delivery and taxes are calculated at checkout.</p>
+      {# Feature 30: Gift Wrapping #}
+      <div class="mt-5 border-t border-sand pt-5">
+        <label class="flex items-center gap-3 cursor-pointer">
+          <input type="checkbox" id="gift-wrap-toggle" class="size-4 accent-ink">
+          <span class="text-sm font-semibold">Add gift wrapping (+$3.00)</span>
+        </label>
+        <div id="gift-wrap-details" hidden class="mt-3 overflow-hidden transition-all duration-300" style="max-height:0">
+          <input name="gift_message" placeholder="Write your personal message here..." class="min-h-11 w-full border border-sand bg-white px-4 text-sm">
+        </div>
+      </div>
+
+      {# Feature 7: Trust Badges #}
+      <div class="mt-5 grid grid-cols-2 gap-2">
+        {% for badge_icon, badge_label in [("🔒", "Secure Checkout"), ("✅", "SSL Encrypted"), ("🔄", "Easy Returns"), ("🌿", "100% Natural")] %}
+          <div class="flex items-center gap-2 rounded bg-neutral-100 px-3 py-2">
+            <span class="text-base">{{ badge_icon }}</span>
+            <span class="text-[0.65rem] font-semibold text-bark">{{ badge_label }}</span>
+          </div>
+        {% endfor %}
+      </div>
+
       <a href="{{ url_for('checkout') }}" class="btn-primary mt-6 w-full">Secure checkout</a>
     </aside>
   </div>

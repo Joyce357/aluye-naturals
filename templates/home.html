@@ -58,6 +58,16 @@
   </div>
 </section>
 
+{# Feature 21: Find Your Ritual Quiz CTA #}
+<section class="border-y border-sand bg-cream py-12 md:py-16">
+  <div class="page-shell text-center">
+    <p class="eyebrow text-clay">Not sure where to start?</p>
+    <h2 class="mt-3 font-display text-4xl font-semibold md:text-5xl">Find Your Ritual</h2>
+    <p class="mx-auto mt-4 max-w-md text-bark">Answer 5 quick questions and we'll recommend the perfect products for your skin, hair and body care routine.</p>
+    <a href="{{ url_for('quiz') }}" class="btn-primary mt-7">Take the Quiz</a>
+  </div>
+</section>
+
 {% if homepage_settings.get('new_arrivals', true) %}
 <section class="border-y border-sand bg-cream py-16 md:py-20">
   <div class="page-shell">
@@ -116,12 +126,33 @@
     <div class="max-w-2xl"><p class="eyebrow text-neutral-600">Ingredient intelligence</p><h2 class="section-heading mt-3">Powerful by nature</h2><p class="mt-5 text-base leading-7 text-neutral-600">A closer look at the ingredients behind Aluyè’s everyday rituals.</p></div>
     <div class="mt-10 grid gap-px border border-neutral-200 bg-neutral-200 sm:grid-cols-2 lg:grid-cols-4">
       {% for ingredient in ingredients %}
-      <article class="bg-white p-7"><p class="eyebrow text-clay">{{ ingredient["origin"] }}</p><h3 class="mt-8 font-display text-3xl font-semibold">{{ ingredient["name"] }}</h3><p class="mt-4 text-sm leading-6 text-neutral-600">{{ ingredient["description"] }}</p><a href="{{ url_for('blog') }}" class="mt-8 inline-flex items-center gap-2 text-sm font-bold">Explore {{ ingredient["name"] }} {{ icon("arrow", "size-4") }}</a></article>
+      <article class="bg-white p-7"><p class="eyebrow text-clay">{{ ingredient["origin"] }}</p><h3 class="mt-8 font-display text-3xl font-semibold">{{ ingredient["name"] }}</h3><p class="mt-4 text-sm leading-6 text-neutral-600">{{ ingredient["description"] }}</p><a href="{{ url_for('ingredients_page') }}#{{ ingredient['name']|lower|replace(' ', '-') }}" class="mt-8 inline-flex items-center gap-2 text-sm font-bold">Explore {{ ingredient["name"] }} {{ icon("arrow", "size-4") }}</a></article>
       {% endfor %}
     </div>
   </div>
 </section>
 {% endif %}
+
+{# Feature 13: UGC Customer Photo Gallery #}
+<section class="py-16 md:py-20">
+  <div class="page-shell">
+    <div class="text-center"><p class="eyebrow text-neutral-600">From our community</p><h2 class="section-heading mt-3">Real Rituals</h2></div>
+    <div class="mt-10 grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-4">
+      {% for p in products[:8] %}
+      <div class="group relative aspect-square overflow-hidden bg-white">
+        <img src="{{ url_for('media', collection='products', filename=p.image) }}" alt="" loading="lazy" class="h-full w-full object-contain p-4">
+        <div class="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 transition group-hover:opacity-100">
+          <div class="text-center text-white">
+            <span class="text-2xl">♥</span>
+            <p class="mt-1 text-sm font-semibold">{{ (42 + loop.index * 7) }}</p>
+          </div>
+        </div>
+        <p class="absolute bottom-0 inset-x-0 bg-white/90 px-3 py-2 text-xs font-semibold">{{ ["Amara", "Nia", "Malik", "Aisha", "Joyce", "Zara", "Oba", "Kemi"][loop.index0 % 8] }} · {{ p.name }}</p>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</section>
 
 {% if homepage_settings.get('journal', true) %}
 <section class="bg-black py-16 text-white md:py-24">
@@ -135,4 +166,27 @@
   </div>
 </section>
 {% endif %}
+{# Feature 12: Instagram Feed Section #}
+<section class="bg-white py-16 md:py-20">
+  <div class="page-shell">
+    <div class="text-center">
+      <p class="eyebrow text-neutral-600">Follow our ritual</p>
+      <h2 class="section-heading mt-3">@aluye_naturals</h2>
+      <a href="https://instagram.com/aluye_naturals" target="_blank" rel="noopener" class="mt-2 inline-block text-sm font-semibold underline">Follow on Instagram</a>
+    </div>
+    <div class="mt-10 grid grid-cols-3 gap-1 md:grid-cols-6">
+      {% for p in products[:6] %}
+      <a href="https://instagram.com/aluye_naturals" target="_blank" rel="noopener" class="group relative aspect-square overflow-hidden bg-neutral-100">
+        <img src="{{ url_for('media', collection='products', filename=p.image) }}" alt="" loading="lazy" class="h-full w-full object-contain p-3">
+        <div class="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 transition group-hover:opacity-100">
+          <div class="text-center text-white">
+            <span class="text-2xl">♥</span>
+            <p class="mt-1 text-sm font-semibold">{{ (85 + loop.index * 13) }}</p>
+          </div>
+        </div>
+      </a>
+      {% endfor %}
+    </div>
+  </div>
+</section>
 {% endblock %}

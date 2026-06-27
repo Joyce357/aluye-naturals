@@ -24,6 +24,10 @@
       <div class="lg:sticky lg:top-36">
         <p class="eyebrow text-clay">{{ product.category }}</p>
         <h1 class="mt-3 font-display text-5xl font-semibold leading-none md:text-6xl">{{ product.name }}</h1>
+
+        {# Feature 11: Live viewer counter #}
+        <p class="mt-2 text-sm" style="color: #c67a3c;">🔥 <span data-live-viewers>0</span> people are viewing this right now</p>
+
         <div class="mt-5 flex items-center gap-3 text-sm">
           <span role="img" aria-label="{{ product.rating }} out of 5 stars" class="flex text-kraft">{% for _ in range(5) %}{{ icon("star", "size-4") }}{% endfor %}</span>
           <span>{{ product.rating }} · {{ product.reviews }} reviews</span>
@@ -34,7 +38,16 @@
           <span class="text-xl font-semibold tabular-nums" data-money data-price="{{ product.price }}">${{ product.price }}</span>
         </div>
 
-        <form action="{{ url_for('cart_add', slug=product.slug) }}" method="post" class="mt-6">
+        {# Feature 8: Buy Now Pay Later #}
+        <p class="mt-3 flex items-center gap-2 text-sm text-bark">
+          Or 4 interest-free payments of <strong data-money data-price="{{ (product.price / 4)|round(2) }}">${{ (product.price / 4)|round(2) }}</strong> with Afterpay
+          <button type="button" data-bnpl-info class="inline-flex size-5 items-center justify-center rounded-full border border-bark/20 text-xs text-bark">ⓘ</button>
+        </p>
+        <div id="bnpl-tooltip" hidden class="mt-2 border border-sand bg-cream p-4 text-sm text-bark">
+          Pay in 4 instalments. No interest. Available at checkout.
+        </div>
+
+        <form action="{{ url_for('cart_add', slug=product.slug) }}" method="post" class="mt-6" data-sticky-source>
           <label for="quantity" class="text-sm font-semibold">Quantity</label>
           <div class="mt-2 flex gap-3">
             <select id="quantity" name="quantity" class="min-h-12 w-24 border border-sand bg-cream px-4">
@@ -45,6 +58,13 @@
           <button name="next" value="{{ url_for('checkout') }}" class="mt-3 min-h-12 w-full border border-black bg-white text-sm font-bold text-black hover:bg-neutral-100">Shop now</button>
         </form>
         <button type="button" data-wishlist aria-pressed="false" class="mt-3 inline-flex min-h-12 w-full items-center justify-center gap-2 border border-ink text-sm font-semibold">{{ icon("heart") }} Add to wishlist</button>
+
+        {# Ingredient chips (Feature 22) #}
+        <div class="mt-5 flex flex-wrap gap-2">
+          {% for ingredient in product.ingredients %}
+            <span class="border border-sand bg-cream px-3 py-1.5 text-xs font-semibold">{{ ingredient }}</span>
+          {% endfor %}
+        </div>
 
         <div class="mt-8 divide-y divide-sand border-y border-sand">
           {% for title, content in [("Best for", product.best_for), ("How to use", product.how_to), ("Key ingredients", product.ingredients|join(", "))] %}
@@ -59,13 +79,133 @@
   </div>
 </section>
 
+{# Feature 4: You May Also Like / Upsell #}
 <section class="bg-cream py-16 md:py-24">
   <div class="page-shell">
-    <p class="eyebrow text-bark">Complete the ritual</p>
-    <h2 class="section-heading mt-3">Pair it with</h2>
+    <p class="eyebrow text-bark">Complete your ritual</p>
+    <h2 class="section-heading mt-3">You may also like</h2>
     <div class="mt-8 grid grid-cols-2 gap-4 lg:grid-cols-3 lg:gap-6">
       {% for item in related %}{{ product_card(item) }}{% endfor %}
     </div>
   </div>
 </section>
+
+{# Feature 10: Reviews Section #}
+<section class="py-16 md:py-20">
+  <div class="page-shell max-w-4xl">
+    <h2 class="section-heading">Customer Reviews</h2>
+    <div class="mt-4 flex items-center gap-3">
+      <span class="flex text-kraft">{% for _ in range(5) %}{{ icon("star", "size-5") }}{% endfor %}</span>
+      <span class="text-lg font-semibold">{{ product.rating }} out of 5</span>
+      <span class="text-sm text-bark">({{ product.reviews }} reviews)</span>
+    </div>
+
+    <div class="mt-8 border-t border-sand">
+      <details class="py-6">
+        <summary class="cursor-pointer font-semibold">Write a Review</summary>
+        <form action="{{ url_for('submit_review', slug=product.slug) }}" method="post" class="mt-5 space-y-4">
+          <div>
+            <label class="text-sm font-semibold">Rating</label>
+            <div class="mt-2 flex gap-1">
+              {% for i in range(1, 6) %}
+                <label class="cursor-pointer text-2xl text-sand hover:text-kraft">
+                  <input type="radio" name="rating" value="{{ i }}" class="sr-only" required>
+                  {{ icon("star", "size-6") }}
+                </label>
+              {% endfor %}
+            </div>
+          </div>
+          <div>
+            <label for="review-name" class="text-sm font-semibold">Your name</label>
+            <input id="review-name" name="reviewer_name" required class="mt-1 min-h-11 w-full border border-sand bg-cream px-4">
+          </div>
+          <div>
+            <label for="review-email" class="text-sm font-semibold">Email (not displayed)</label>
+            <input id="review-email" name="reviewer_email" type="email" required class="mt-1 min-h-11 w-full border border-sand bg-cream px-4">
+          </div>
+          <div>
+            <label for="review-title" class="text-sm font-semibold">Review title</label>
+            <input id="review-title" name="review_title" required class="mt-1 min-h-11 w-full border border-sand bg-cream px-4">
+          </div>
+          <div>
+            <label for="review-body" class="text-sm font-semibold">Your review</label>
+            <textarea id="review-body" name="review_body" rows="4" required class="mt-1 w-full border border-sand bg-cream p-4"></textarea>
+          </div>
+          <button class="btn-primary">Submit Review</button>
+        </form>
+      </details>
+    </div>
+
+    {% if reviews %}
+      <div class="divide-y divide-sand">
+        {% for review in reviews %}
+          <article class="py-6">
+            <div class="flex items-center gap-3">
+              <span class="flex text-kraft">{% for _ in range(review.rating) %}{{ icon("star", "size-4") }}{% endfor %}</span>
+              <span class="text-sm font-semibold">{{ review.name }}</span>
+              <span class="text-xs text-bark">{{ review.created_at[:10] }}</span>
+            </div>
+            <h3 class="mt-2 font-semibold">{{ review.title }}</h3>
+            <p class="mt-2 text-sm leading-6 text-bark">{{ review.body }}</p>
+          </article>
+        {% endfor %}
+      </div>
+    {% else %}
+      <p class="py-8 text-center text-bark">No reviews yet. Be the first to share your experience.</p>
+    {% endif %}
+  </div>
+</section>
+
+{# Feature 6: Recently Viewed — rendered via JS into this container #}
+<section id="recently-viewed" hidden class="border-t border-sand py-12">
+  <div class="page-shell">
+    <h2 class="section-heading">Recently Viewed</h2>
+    <div id="recently-viewed-grid" class="mt-6 grid grid-cols-2 gap-4 lg:grid-cols-6"></div>
+  </div>
+</section>
+
+{# Feature 5: Sticky Add to Cart Bar #}
+<div id="sticky-add-bar" class="fixed inset-x-0 bottom-0 z-50 translate-y-full border-t border-sand bg-white px-4 py-3 shadow-xl transition-transform duration-300 md:hidden">
+  <div class="flex items-center gap-4">
+    <div class="min-w-0 flex-1">
+      <p class="truncate text-sm font-semibold">{{ product.name }}</p>
+      <p class="text-sm font-semibold" data-money data-price="{{ product.price }}">${{ product.price }}</p>
+    </div>
+    <form action="{{ url_for('cart_add', slug=product.slug) }}" method="post">
+      <button class="btn-primary whitespace-nowrap px-5">Add to Cart</button>
+    </form>
+  </div>
+</div>
+
+<script>
+  trackRecentlyViewed("{{ product.slug }}");
+  (function() {
+    const items = getRecentlyViewed("{{ product.slug }}");
+    if (!items.length) return;
+    const section = document.querySelector("#recently-viewed");
+    const grid = document.querySelector("#recently-viewed-grid");
+    if (!section || !grid) return;
+    fetch("/api/search?q=")
+      .then(r => r.json())
+      .then(data => {
+        const products = data.results || [];
+        const slugMap = {};
+        products.forEach(p => slugMap[p.slug] = p);
+        const html = items.filter(i => slugMap[i.slug]).map(i => {
+          const p = slugMap[i.slug];
+          return `<a href="/products/${p.slug}" class="group text-center">
+            <div class="aspect-[4/5] border border-sand bg-white overflow-hidden">
+              <img src="/media/products/${p.image}" alt="${p.name}" class="h-full w-full object-contain p-3">
+            </div>
+            <p class="mt-3 text-sm font-semibold">${p.name}</p>
+            <p class="mt-1 text-sm text-bark">${formatMoney(p.price)}</p>
+          </a>`;
+        }).join("");
+        if (html) {
+          grid.innerHTML = html;
+          section.hidden = false;
+        }
+      });
+  })();
+</script>
 {% endblock %}

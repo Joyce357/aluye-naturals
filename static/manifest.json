@@ -1,0 +1,21 @@
+{
+  "name": "Aluyè Naturals",
+  "short_name": "Aluyè",
+  "description": "Small-batch care, rooted in nature",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f9f6f1",
+  "theme_color": "#1a1a1a",
+  "icons": [
+    {
+      "src": "/media/products/Aluye Naturals Logo.jpg",
+      "sizes": "192x192",
+      "type": "image/jpeg"
+    },
+    {
+      "src": "/media/products/Aluye Naturals Logo.jpg",
+      "sizes": "512x512",
+      "type": "image/jpeg"
+    }
+  ]
+}

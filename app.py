@@ -40,6 +40,12 @@ def create_app(test_config=None):
     app.config.from_mapping(
         SECRET_KEY=os.environ.get("SECRET_KEY", "dev-change-me"),
         SITE_URL=os.environ.get("SITE_URL", "http://127.0.0.1:5000").rstrip("/"),
+        MAIL_SERVER=os.environ.get("MAIL_SERVER", "smtp.gmail.com"),
+        MAIL_PORT=int(os.environ.get("MAIL_PORT", 587)),
+        MAIL_USE_TLS=True,
+        MAIL_USERNAME=os.environ.get("MAIL_USERNAME", ""),
+        MAIL_PASSWORD=os.environ.get("MAIL_PASSWORD", ""),
+        MAIL_DEFAULT_SENDER=os.environ.get("MAIL_USERNAME", "noreply@aluyenaturals.com"),
     )
     if test_config:
         app.config.update(test_config)
@@ -201,6 +207,59 @@ def create_app(test_config=None):
     def health():
         return {"status": "ok", "service": "aluye-naturals"}
 
+    @app.get("/api/search")
+    def api_search():
+        query = request.args.get("q", "").strip()
+        if not query:
+            return {"results": [
+                {
+                    "slug": p["slug"],
+                    "name": p["name"],
+                    "category": p.get("segment", p.get("category", "")),
+                    "price": p["price"],
+                    "image": p["image"],
+                }
+                for p in PRODUCTS
+            ]}
+        if len(query) < 2:
+            return {"results": []}
+        needle = query.casefold()
+        results = [
+            {
+                "slug": p["slug"],
+                "name": p["name"],
+                "category": p.get("segment", p.get("category", "")),
+                "price": p["price"],
+                "image": p["image"],
+            }
+            for p in PRODUCTS
+            if needle
+            in " ".join(
+                [
+                    p["name"],
+                    p.get("category", ""),
+                    p.get("segment", ""),
+                    p.get("benefit", ""),
+                    " ".join(p.get("ingredients", [])),
+                ]
+            ).casefold()
+        ]
+        return {"results": results[:10]}
+
+    @app.post("/api/subscribe")
+    def api_subscribe():
+        from admin import get_db, add_notification
+        email = request.form.get("email", "").strip()
+        if email and "@" in email:
+            db = get_db()
+            db.execute(
+                "INSERT OR IGNORE INTO subscribers(email, created_at) VALUES(?, ?)",
+                (email, __import__("datetime").datetime.now().isoformat(timespec="minutes")),
+            )
+            db.commit()
+            add_notification("subscriber", "New subscriber", email)
+        return {"ok": True}
+
     @app.get("/shop")
     def shop():
         category = request.args.get("category", "").strip()
@@ -331,6 +390,7 @@ def create_app(test_config=None):
 
     @app.get("/products/<slug>")
     def product_detail(slug):
+        from admin import get_db
         product = get_product(slug)
         record_product_event(slug, "view")
         seo = page_seo(
@@ -350,10 +410,15 @@ def create_app(test_config=None):
                 for item in PRODUCTS
                 if item["slug"] != slug and item not in related
             ][: 3 - len(related)]
+        reviews = get_db().execute(
+            "SELECT name, rating, title, body, created_at FROM reviews WHERE product_slug=? AND status='approved' ORDER BY created_at DESC",
+            (slug,),
+        ).fetchall()
         return render_template(
             "product.html",
             product=product,
             related=related,
+            reviews=reviews,
             seo=seo,
             structured_data=[
                 {
@@ -390,6 +455,27 @@ def create_app(test_config=None):
         cart = session.get("cart", {})
         cart[slug] = cart.get(slug, 0) + quantity
         session["cart"] = cart
+        if request.headers.get("X-Requested-With") == "XMLHttpRequest":
+            items, subtotal = cart_summary()
+            return {
+                "ok": True,
+                "cart_count": sum(session.get("cart", {}).values()),
+                "subtotal": subtotal,
+                "shipping_remaining": max(0, FREE_SHIPPING_THRESHOLD - subtotal),
+                "items": [
+                    {
+                        "slug": i["product"]["slug"],
+                        "name": i["product"]["name"],
+                        "image": i["product"]["image"],
+                        "price": i["product"]["price"],
+                        "size": i["product"].get("size", ""),
+                        "category": i["product"].get("category", ""),
+                        "quantity": i["quantity"],
+                        "line_total": i["line_total"],
+                    }
+                    for i in items
+                ],
+            }
         flash("Added to your bag.", "success")
         next_url = request.form.get("next", "")
         return redirect(next_url if next_url.startswith("/") else url_for("cart"))
@@ -411,6 +497,32 @@ def create_app(test_config=None):
             seo=seo,
         )
 
+    def _cart_json():
+        items, subtotal = cart_summary()
+        return {
+            "ok": True,
+            "cart_count": sum(session.get("cart", {}).values()),
+            "subtotal": subtotal,
+            "shipping_remaining": max(0, FREE_SHIPPING_THRESHOLD - subtotal),
+            "items": [
+                {
+                    "slug": i["product"]["slug"],
+                    "name": i["product"]["name"],
+                    "image": i["product"]["image"],
+                    "price": i["product"]["price"],
+                    "size": i["product"].get("size", ""),
+                    "category": i["product"].get("category", ""),
+                    "quantity": i["quantity"],
+                    "line_total": i["line_total"],
+                }
+                for i in items
+            ],
+        }
+
+    @app.get("/api/cart")
+    def api_cart():
+        return _cart_json()
+
     @app.post("/cart/update/<slug>")
     def cart_update(slug):
         get_product(slug)
@@ -421,6 +533,8 @@ def create_app(test_config=None):
         else:
             cart[slug] = quantity
         session["cart"] = cart
+        if request.headers.get("X-Requested-With") == "XMLHttpRequest":
+            return _cart_json()
         return redirect(url_for("cart"))
 
     @app.post("/cart/remove/<slug>")
@@ -428,6 +542,8 @@ def create_app(test_config=None):
         cart = session.get("cart", {})
         cart.pop(slug, None)
         session["cart"] = cart
+        if request.headers.get("X-Requested-With") == "XMLHttpRequest":
+            return _cart_json()
         flash("Item removed from your bag.", "success")
         return redirect(url_for("cart"))
 
@@ -482,6 +598,134 @@ def create_app(test_config=None):
                 robots="noindex,nofollow",
             ),
         )
+
+    @app.post("/products/<slug>/review")
+    def submit_review(slug):
+        from admin import get_db, add_notification
+        get_product(slug)
+        name = request.form.get("reviewer_name", "").strip()
+        email = request.form.get("reviewer_email", "").strip()
+        rating = request.form.get("rating", "5")
+        title = request.form.get("review_title", "").strip()
+        body_text = request.form.get("review_body", "").strip()
+        if name and email and title and body_text:
+            try:
+                rating = min(5, max(1, int(rating)))
+            except (ValueError, TypeError):
+                rating = 5
+            db = get_db()
+            db.execute(
+                "INSERT INTO reviews(product_slug, name, email, rating, title, body, created_at) VALUES(?,?,?,?,?,?,?)",
+                (slug, name, email, rating, title, body_text,
+                 __import__("datetime").datetime.now().isoformat(timespec="minutes")),
+            )
+            db.commit()
+            add_notification("review", "New review submitted", f"{name} reviewed {slug}")
+            flash("Thank you! Your review is pending approval.", "success")
+        else:
+            flash("Please complete all fields.", "error")
+        return redirect(url_for("product_detail", slug=slug))
+
+    @app.route("/track-order", methods=["GET", "POST"])
+    def track_order():
+        from admin import get_db
+        order = None
+        error = None
+        if request.method == "POST":
+            order_number = request.form.get("order_number", "").strip()
+            email = request.form.get("email", "").strip()
+            if order_number and email:
+                order = get_db().execute(
+                    "SELECT * FROM orders WHERE order_number=? AND email=?",
+                    (order_number, email),
+                ).fetchone()
+                if not order:
+                    error = "Order not found. Please check your order number and email."
+            else:
+                error = "Please enter both your order number and email."
+        return render_template(
+            "track_order.html",
+            order=order,
+            error=error,
+            seo=page_seo("Track Your Order | Aluyè Naturals", "Track the status of your Aluyè Naturals order.", "/track-order", robots="noindex,follow"),
+        )
+
+    @app.route("/returns", methods=["GET", "POST"])
+    def returns():
+        from admin import get_db, add_notification
+        submitted = False
+        reference = None
+        if request.method == "POST":
+            order_number = request.form.get("order_number", "").strip()
+            email = request.form.get("email", "").strip()
+            items_text = request.form.get("items", "").strip()
+            reason = request.form.get("reason", "").strip()
+            details = request.form.get("details", "").strip()
+            refund_method = request.form.get("refund_method", "").strip()
+            if order_number and email and items_text and reason and refund_method:
+                reference = f"RET-{abs(hash((order_number, email))) % 900000 + 100000}"
+                db = get_db()
+                db.execute(
+                    "INSERT OR IGNORE INTO return_requests(reference, order_number, email, items, reason, details, refund_method, created_at) VALUES(?,?,?,?,?,?,?,?)",
+                    (reference, order_number, email, items_text, reason, details, refund_method,
+                     __import__("datetime").datetime.now().isoformat(timespec="minutes")),
+                )
+                db.commit()
+                add_notification("return", "New return request", f"{reference} for {order_number}")
+                submitted = True
+            else:
+                flash("Please complete all required fields.", "error")
+        return render_template(
+            "returns.html",
+            submitted=submitted,
+            reference=reference,
+            seo=page_seo("Returns & Refunds | Aluyè Naturals", "Request a return or refund for your Aluyè Naturals order.", "/returns"),
+        )
+
+    @app.get("/wishlist")
+    def wishlist_page():
+        return render_template(
+            "wishlist.html",
+            products=PRODUCTS,
+            seo=page_seo("Your Wishlist | Aluyè Naturals", "View your saved Aluyè Naturals products.", "/wishlist", robots="noindex,follow"),
+        )
+
+    @app.get("/compare")
+    def compare_page():
+        return render_template(
+            "compare.html",
+            products=PRODUCTS,
+            seo=page_seo("Compare Products | Aluyè Naturals", "Compare Aluyè Naturals products side by side.", "/compare", robots="noindex,follow"),
+        )
+
+    @app.get("/quiz")
+    def quiz():
+        return render_template(
+            "quiz.html",
+            products=PRODUCTS,
+            seo=page_seo("Find Your Ritual | Aluyè Naturals", "Take our quiz to discover your perfect Aluyè Naturals routine.", "/quiz"),
+        )
+
+    @app.get("/ingredients")
+    def ingredients_page():
+        return render_template(
+            "ingredients_page.html",
+            ingredients=INGREDIENTS,
+            products=PRODUCTS,
+            seo=page_seo("Ingredients | Aluyè Naturals", "Explore the natural ingredients behind Aluyè Naturals.", "/ingredients"),
+        )
+
+    @app.get("/offline")
+    def offline():
+        return render_template("offline.html")
+
+    @app.get("/sw.js")
+    def service_worker():
+        return send_from_directory(BASE_DIR / "static", "sw.js", mimetype="application/javascript")
+
+    @app.get("/manifest.json")
+    def manifest():
+        return send_from_directory(BASE_DIR / "static", "manifest.json", mimetype="application/manifest+json")
 
     @app.get("/robots.txt")
     def robots():

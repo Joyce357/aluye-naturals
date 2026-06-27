@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% from "macros.html" import icon %}
+
+{% block content %}
+<section class="page-shell py-12 md:py-16">
+  <div class="max-w-2xl mx-auto">
+    <p class="eyebrow text-bark">Order support</p>
+    <h1 class="mt-3 font-display text-5xl font-semibold leading-none md:text-6xl">Track your order</h1>
+    <p class="mt-5 text-base leading-7 text-bark">Enter your order number and email address to see the latest status.</p>
+
+    <form method="post" class="mt-8 space-y-5">
+      <div>
+        <label for="order_number" class="text-sm font-semibold">Order number</label>
+        <input id="order_number" name="order_number" required placeholder="e.g. AN-210345" class="mt-2 min-h-12 w-full border border-sand bg-cream px-4">
+      </div>
+      <div>
+        <label for="email" class="text-sm font-semibold">Email address</label>
+        <input id="email" name="email" type="email" required class="mt-2 min-h-12 w-full border border-sand bg-cream px-4">
+      </div>
+      <button class="btn-primary w-full">Track Order</button>
+    </form>
+
+    {% if error %}
+      <div class="mt-8 border border-sand bg-cream p-6 text-center">
+        <p class="text-bark">{{ error }}</p>
+        <a href="{{ url_for('contact') }}" class="mt-3 inline-block text-sm font-semibold underline">Contact us for help</a>
+      </div>
+    {% endif %}
+
+    {% if order %}
+      <div class="mt-10 border border-sand bg-cream p-6">
+        <h2 class="font-display text-3xl font-semibold">Order {{ order.order_number }}</h2>
+        <p class="mt-2 text-sm text-bark">Placed {{ order.created_at[:10] }}</p>
+
+        {% set statuses = ["Pending", "Processing", "Shipped", "Delivered"] %}
+        {% set current_index = statuses.index(order.status) if order.status in statuses else 0 %}
+        <div class="mt-8 flex items-center justify-between">
+          {% for s in statuses %}
+            <div class="flex flex-col items-center gap-2 text-center">
+              <div class="flex size-10 items-center justify-center rounded-full {% if loop.index0 <= current_index %}bg-botanical text-white{% else %}border-2 border-sand bg-white{% endif %}">
+                {% if loop.index0 <= current_index %}✓{% else %}{{ loop.index }}{% endif %}
+              </div>
+              <span class="text-xs font-semibold {% if loop.index0 <= current_index %}text-ink{% else %}text-bark{% endif %}">{{ s }}</span>
+            </div>
+            {% if not loop.last %}
+              <div class="h-0.5 flex-1 {% if loop.index0 < current_index %}bg-botanical{% else %}bg-sand{% endif %}"></div>
+            {% endif %}
+          {% endfor %}
+        </div>
+
+        {% if order.tracking %}
+          <p class="mt-6 text-sm">Tracking number: <strong>{{ order.tracking }}</strong></p>
+        {% endif %}
+
+        <div class="mt-6 border-t border-sand pt-5">
+          <p class="text-sm font-semibold">Shipping to</p>
+          <p class="mt-1 text-sm text-bark">{{ order.customer_name }} · {{ order.address }}</p>
+        </div>
+        <div class="mt-4">
+          <p class="text-sm font-semibold">Total</p>
+          <p class="mt-1 text-lg font-semibold" data-money data-price="{{ order.total }}">${{ order.total }}</p>
+        </div>
+      </div>
+    {% endif %}
+  </div>
+</section>
+{% endblock %}

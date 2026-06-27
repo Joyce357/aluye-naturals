@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+{% from "macros.html" import icon %}
+
+{% block content %}
+<section class="page-shell py-12 md:py-16">
+  <div class="flex items-end justify-between border-b border-sand pb-6">
+    <div>
+      <p class="eyebrow text-bark">Side by side</p>
+      <h1 class="mt-3 font-display text-5xl font-semibold leading-none md:text-6xl">Compare Products</h1>
+    </div>
+    <button id="clear-compare" class="text-sm font-semibold underline">Clear All</button>
+  </div>
+
+  <div id="compare-table" class="mt-10 overflow-x-auto"></div>
+
+  <div id="compare-empty" hidden class="py-24 text-center">
+    <h2 class="mt-5 font-display text-4xl font-semibold">No products to compare</h2>
+    <p class="mt-3 text-bark">Select up to 3 products from the shop to compare them.</p>
+    <a href="{{ url_for('shop') }}" class="btn-primary mt-7">Browse products</a>
+  </div>
+</section>
+
+<script>
+(function() {
+  const KEY = "aluye-compare";
+  const slugs = JSON.parse(sessionStorage.getItem(KEY) || "[]");
+  const table = document.querySelector("#compare-table");
+  const empty = document.querySelector("#compare-empty");
+  const allProducts = {{ products|tojson }};
+  const items = slugs.map(s => allProducts.find(p => p.slug === s)).filter(Boolean);
+
+  if (!items.length) { table.hidden = true; empty.hidden = false; return; }
+
+  const rows = [
+    ["", ...items.map(p => `<div class="text-center"><a href="/products/${p.slug}"><img src="/media/products/${p.image}" alt="${p.name}" class="mx-auto h-40 object-contain"></a></div>`)],
+    ["Name", ...items.map(p => `<strong>${p.name}</strong>`)],
+    ["Category", ...items.map(p => p.segment || p.category)],
+    ["Price", ...items.map(p => `<span data-money data-price="${p.price}">$${p.price}</span>`)],
+    ["Size", ...items.map(p => p.size || "—")],
+    ["Description", ...items.map(p => `<span class="text-sm text-bark">${p.benefit || p.description}</span>`)],
+    ["Ingredients", ...items.map(p => `<span class="text-sm text-bark">${(p.ingredients||[]).join(", ")}</span>`)],
+    ["", ...items.map(p => `<form action="/cart/add/${p.slug}" method="post"><button class="btn-primary w-full">Add to Cart</button></form>`)],
+  ];
+
+  table.innerHTML = `<table class="w-full min-w-[600px] border-collapse">
+    ${rows.map((r, i) => `<tr class="${i ? 'border-t border-sand' : ''}">
+      <td class="p-4 text-sm font-semibold align-top w-32">${r[0]}</td>
+      ${r.slice(1).map(c => `<td class="p-4 align-top">${c}</td>`).join("")}
+    </tr>`).join("")}
+  </table>`;
+  updateCurrency();
+
+  document.querySelector("#clear-compare").addEventListener("click", () => {
+    sessionStorage.removeItem(KEY);
+    table.hidden = true;
+    empty.hidden = false;
+  });
+})();
+</script>
+{% endblock %}

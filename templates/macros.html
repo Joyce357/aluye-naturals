@@ -40,18 +40,10 @@
     </a>
     <button
       type="button"
-      data-quick-view
-      data-name="{{ product.name|e }}"
-      data-category="{{ product.segment|e }} · {{ product.category|e }}"
-      data-description="{{ product.description|e }}"
-      data-rating="{{ product.rating }}"
-      data-reviews="{{ product.reviews }}"
-      data-price="{{ product.price }}"
-      data-image="{{ url_for('media', collection='products', filename=product.image) }}"
-      data-product-url="{{ url_for('product_detail', slug=product.slug) }}"
+      data-quick-add
       data-cart-url="{{ url_for('cart_add', slug=product.slug) }}"
-      class="quick-view absolute inset-x-3 bottom-3 z-20 hidden min-h-11 translate-y-3 items-center justify-center bg-black px-4 text-xs font-bold uppercase tracking-wide text-white opacity-0 transition duration-200 lg:flex"
-    >Quick view</button>
+      class="quick-add absolute inset-x-3 bottom-3 z-20 hidden min-h-11 translate-y-3 items-center justify-center bg-black px-4 text-xs font-bold uppercase tracking-wide text-white opacity-0 transition duration-200 lg:flex"
+    >Quick Add</button>
   </div>
   <div class="p-4">
     <p class="eyebrow text-neutral-600">{{ product.segment }} · {{ product.category }}</p>

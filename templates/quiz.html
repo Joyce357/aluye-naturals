@@ -1,0 +1,134 @@
+{% extends "base.html" %}
+{% from "macros.html" import icon %}
+
+{% block content %}
+<section class="page-shell py-12 md:py-16">
+  <div class="mx-auto max-w-2xl text-center">
+    <p class="eyebrow text-clay">Personalised for you</p>
+    <h1 class="mt-3 font-display text-5xl font-semibold leading-none md:text-6xl">Find Your Ritual</h1>
+    <p class="mt-5 text-bark">Answer 5 quick questions and we'll recommend the perfect products for your routine.</p>
+  </div>
+
+  <div id="quiz-container" class="mx-auto mt-12 max-w-xl">
+    <div data-quiz-step="0" class="space-y-4">
+      <h2 class="font-display text-3xl font-semibold">What's your skin type?</h2>
+      <div class="grid grid-cols-2 gap-3">
+        {% for opt in ["Dry", "Oily", "Combination", "Normal", "Sensitive"] %}
+          <button type="button" data-quiz-answer="skin_type" data-value="{{ opt }}" class="quiz-option min-h-14 border border-sand bg-cream px-4 text-sm font-semibold hover:border-ink hover:bg-ink hover:text-white transition">{{ opt }}</button>
+        {% endfor %}
+      </div>
+    </div>
+
+    <div data-quiz-step="1" hidden class="space-y-4">
+      <h2 class="font-display text-3xl font-semibold">What's your main skin concern?</h2>
+      <div class="grid grid-cols-2 gap-3">
+        {% for opt in ["Moisture & Hydration", "Glow & Radiance", "Acne & Blemishes", "Anti-ageing", "Even Skin Tone"] %}
+          <button type="button" data-quiz-answer="skin_concern" data-value="{{ opt }}" class="quiz-option min-h-14 border border-sand bg-cream px-4 text-sm font-semibold hover:border-ink hover:bg-ink hover:text-white transition">{{ opt }}</button>
+        {% endfor %}
+      </div>
+    </div>
+
+    <div data-quiz-step="2" hidden class="space-y-4">
+      <h2 class="font-display text-3xl font-semibold">What's your hair concern?</h2>
+      <div class="grid grid-cols-2 gap-3">
+        {% for opt in ["Growth & Length", "Dryness & Breakage", "Scalp Health", "No hair concerns"] %}
+          <button type="button" data-quiz-answer="hair_concern" data-value="{{ opt }}" class="quiz-option min-h-14 border border-sand bg-cream px-4 text-sm font-semibold hover:border-ink hover:bg-ink hover:text-white transition">{{ opt }}</button>
+        {% endfor %}
+      </div>
+    </div>
+
+    <div data-quiz-step="3" hidden class="space-y-4">
+      <h2 class="font-display text-3xl font-semibold">Do you have a beard?</h2>
+      <div class="grid grid-cols-2 gap-3">
+        {% for opt in ["Yes — I want to maintain it", "Yes — it needs work", "No"] %}
+          <button type="button" data-quiz-answer="beard" data-value="{{ opt }}" class="quiz-option min-h-14 border border-sand bg-cream px-4 text-sm font-semibold hover:border-ink hover:bg-ink hover:text-white transition">{{ opt }}</button>
+        {% endfor %}
+      </div>
+    </div>
+
+    <div data-quiz-step="4" hidden class="space-y-4">
+      <h2 class="font-display text-3xl font-semibold">What's your budget per product?</h2>
+      <div class="grid grid-cols-3 gap-3">
+        {% for opt in ["Under $20", "$20–$30", "$30+"] %}
+          <button type="button" data-quiz-answer="budget" data-value="{{ opt }}" class="quiz-option min-h-14 border border-sand bg-cream px-4 text-sm font-semibold hover:border-ink hover:bg-ink hover:text-white transition">{{ opt }}</button>
+        {% endfor %}
+      </div>
+    </div>
+
+    <div data-quiz-step="results" hidden>
+      <h2 class="font-display text-4xl font-semibold">Your perfect ritual</h2>
+      <p class="mt-3 text-bark">Based on your answers, we recommend these products for you.</p>
+      <div id="quiz-results" class="mt-8 grid gap-6"></div>
+      <button type="button" id="quiz-retake" class="btn-secondary mt-8">Retake Quiz</button>
+    </div>
+  </div>
+</section>
+
+<script>
+(function() {
+  const answers = {};
+  const steps = document.querySelectorAll("[data-quiz-step]");
+  let current = 0;
+  const products = {{ products|tojson }};
+
+  document.querySelectorAll("[data-quiz-answer]").forEach(btn => {
+    btn.addEventListener("click", () => {
+      answers[btn.dataset.quizAnswer] = btn.dataset.value;
+      sessionStorage.setItem("aluye-quiz", JSON.stringify(answers));
+      current++;
+      steps.forEach(s => s.hidden = true);
+      if (current < 5) {
+        steps[current].hidden = false;
+      } else {
+        showResults();
+      }
+    });
+  });
+
+  function showResults() {
+    const resultsStep = document.querySelector('[data-quiz-step="results"]');
+    const grid = document.querySelector("#quiz-results");
+    resultsStep.hidden = false;
+
+    let recommended = [];
+    if (answers.skin_concern && answers.skin_concern.includes("Moisture")) {
+      recommended.push(...products.filter(p => p.segment === "Skin Care").slice(0, 2));
+    } else {
+      recommended.push(products.find(p => p.segment === "Skin Care") || products[0]);
+    }
+    if (answers.hair_concern && answers.hair_concern !== "No hair concerns") {
+      recommended.push(...products.filter(p => p.segment === "Hair").slice(0, 1));
+    }
+    if (answers.beard && answers.beard.startsWith("Yes")) {
+      recommended.push(...products.filter(p => p.segment === "Beards" || p.segment === "Men").slice(0, 1));
+    }
+    recommended.push(...products.filter(p => p.category === "Cleanser").slice(0, 1));
+    const seen = new Set();
+    recommended = recommended.filter(p => { if (seen.has(p.slug)) return false; seen.add(p.slug); return true; }).slice(0, 5);
+
+    grid.innerHTML = recommended.map(p => `
+      <article class="flex gap-5 border border-sand bg-white p-4">
+        <a href="/products/${p.slug}" class="w-24 shrink-0">
+          <img src="/media/products/${p.image}" alt="${p.name}" class="h-28 w-full object-contain">
+        </a>
+        <div class="min-w-0 flex-1">
+          <h3 class="font-semibold">${p.name}</h3>
+          <p class="mt-1 text-sm text-bark">${p.benefit}</p>
+          <p class="mt-2 font-semibold" data-money data-price="${p.price}">$${p.price}</p>
+          <form action="/cart/add/${p.slug}" method="post" class="mt-3">
+            <button class="btn-primary px-4 text-xs">Add to Cart</button>
+          </form>
+        </div>
+      </article>
+    `).join("");
+    updateCurrency();
+  }
+
+  document.querySelector("#quiz-retake")?.addEventListener("click", () => {
+    current = 0;
+    steps.forEach(s => s.hidden = true);
+    steps[0].hidden = false;
+  });
+})();
+</script>
+{% endblock %}

@@ -1,0 +1,23 @@
+<!doctype html>
+<html>
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>Back in Stock</title></head>
+<body style="margin:0;padding:0;background:#f9f6f1;font-family:Arial,sans-serif;color:#17130f;">
+  <div style="max-width:600px;margin:0 auto;">
+    <div style="background:#1a1a1a;padding:24px;text-align:center;">
+      <h1 style="margin:0;color:#fff;font-family:Georgia,serif;font-size:28px;">Aluyè Naturals</h1>
+    </div>
+    <div style="background:#fff;padding:40px 32px;text-align:center;">
+      <h2 style="font-family:Georgia,serif;font-size:24px;margin:0 0 16px;">{{ product_name }} is back in stock 🌿</h2>
+      <p style="color:#594a3b;line-height:1.7;margin:0 0 24px;">The product you were waiting for is available again. Don't miss it this time.</p>
+      {% if product_image %}
+      <img src="{{ site_url }}/media/products/{{ product_image }}" alt="{{ product_name }}" style="max-width:200px;margin:0 auto 24px;">
+      {% endif %}
+      <p style="font-size:20px;font-weight:bold;margin:0 0 24px;">${{ product_price }}</p>
+      <a href="{{ site_url }}/products/{{ product_slug }}" style="display:inline-block;background:#17130f;color:#fff;padding:14px 32px;text-decoration:none;font-weight:bold;font-size:14px;">Shop Now</a>
+    </div>
+    <div style="background:#1a1a1a;padding:24px;text-align:center;color:#ffffff99;font-size:12px;">
+      <p style="margin:0;">© 2026 Aluyè Naturals</p>
+    </div>
+  </div>
+</body>
+</html>

@@ -32,6 +32,7 @@ NAV_ITEMS = [
     ("dashboard", "Dashboard"),
     ("products", "Products"),
     ("orders", "Orders"),
+    ("reviews_admin", "Reviews"),
     ("messages", "Messages / Inbox"),
     ("notifications", "Notifications"),
     ("homepage", "Homepage Editor"),
@@ -41,6 +42,9 @@ NAV_ITEMS = [
     ("discounts", "Discount Codes"),
     ("journal", "Blog / Journal"),
     ("analytics", "Analytics"),
+    ("subscribers_admin", "Subscribers"),
+    ("abandoned_admin", "Abandoned Carts"),
+    ("returns_admin", "Returns"),
     ("account", "Account Settings"),
 ]
 
@@ -129,6 +133,52 @@ def init_db():
           id INTEGER PRIMARY KEY AUTOINCREMENT, username TEXT NOT NULL, action TEXT NOT NULL,
           created_at TEXT NOT NULL
         );
+        CREATE TABLE IF NOT EXISTS subscribers (
+          id INTEGER PRIMARY KEY AUTOINCREMENT, email TEXT UNIQUE NOT NULL, created_at TEXT NOT NULL
+        );
+        CREATE TABLE IF NOT EXISTS reviews (
+          id INTEGER PRIMARY KEY AUTOINCREMENT, product_slug TEXT NOT NULL, name TEXT NOT NULL,
+          email TEXT NOT NULL, rating INTEGER NOT NULL, title TEXT NOT NULL, body TEXT NOT NULL,
+          photo TEXT DEFAULT '', status TEXT NOT NULL DEFAULT 'pending',
+          created_at TEXT NOT NULL
+        );
+        CREATE TABLE IF NOT EXISTS wishlist (
+          id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER, product_slug TEXT NOT NULL,
+          created_at TEXT NOT NULL
+        );
+        CREATE TABLE IF NOT EXISTS ugc_photos (
+          id INTEGER PRIMARY KEY AUTOINCREMENT, image TEXT NOT NULL, customer_name TEXT NOT NULL,
+          product_slug TEXT DEFAULT '', active INTEGER DEFAULT 1, sort_order INTEGER DEFAULT 0,
+          created_at TEXT NOT NULL
+        );
+        CREATE TABLE IF NOT EXISTS abandoned_carts (
+          id INTEGER PRIMARY KEY AUTOINCREMENT, email TEXT NOT NULL, items TEXT NOT NULL,
+          total REAL NOT NULL, reminded INTEGER DEFAULT 0, created_at TEXT NOT NULL
+        );
+        CREATE TABLE IF NOT EXISTS return_requests (
+          id INTEGER PRIMARY KEY AUTOINCREMENT, reference TEXT UNIQUE NOT NULL,
+          order_number TEXT NOT NULL, email TEXT NOT NULL, items TEXT NOT NULL,
+          reason TEXT NOT NULL, details TEXT DEFAULT '', refund_method TEXT NOT NULL,
+          status TEXT NOT NULL DEFAULT 'Pending', admin_note TEXT DEFAULT '',
+          created_at TEXT NOT NULL
+        );
+        CREATE TABLE IF NOT EXISTS waitlist (
+          id INTEGER PRIMARY KEY AUTOINCREMENT, product_slug TEXT NOT NULL, email TEXT NOT NULL,
+          created_at TEXT NOT NULL, UNIQUE(product_slug, email)
+        );
+        CREATE TABLE IF NOT EXISTS referrals (
+          id INTEGER PRIMARY KEY AUTOINCREMENT, referrer_code TEXT NOT NULL,
+          referred_email TEXT, status TEXT NOT NULL DEFAULT 'pending',
+          created_at TEXT NOT NULL
+        );
+        CREATE TABLE IF NOT EXISTS loyalty_points (
+          id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER NOT NULL, action TEXT NOT NULL,
+          points INTEGER NOT NULL, created_at TEXT NOT NULL
+        );
+        CREATE TABLE IF NOT EXISTS quiz_responses (
+          id INTEGER PRIMARY KEY AUTOINCREMENT, skin_type TEXT, skin_concern TEXT,
+          hair_concern TEXT, beard TEXT, budget TEXT, created_at TEXT NOT NULL
+        );
         """
     )
     if not db.execute("SELECT 1 FROM admin_users LIMIT 1").fetchone():
@@ -160,6 +210,7 @@ def init_db():
             [
                 ("RITUAL15", "percent", 15, 50, "2026-12-31", 500, 37),
                 ("WELCOME10", "fixed", 10, 40, "2026-09-30", 250, 82),
+                ("RITUAL10", "percent", 10, 0, "2027-12-31", 0, 0),
             ],
         )
     if not db.execute("SELECT 1 FROM orders LIMIT 1").fetchone():
@@ -744,7 +795,7 @@ def homepage():
 
 
 SECTION_CONFIG = {
-    "settings": ("Site Settings", ["store_name", "tagline", "contact_email", "phone", "address", "instagram", "tiktok", "facebook", "pinterest", "meta_title", "meta_description", "base_currency", "supported_currencies", "store_status", "maintenance_message"]),
+    "settings": ("Site Settings", ["store_name", "tagline", "contact_email", "phone", "address", "whatsapp", "instagram", "tiktok", "facebook", "pinterest", "meta_title", "meta_description", "base_currency", "supported_currencies", "store_status", "maintenance_message", "instagram_token", "returns_policy"]),
     "payments": ("Payment Methods", ["stripe_enabled", "stripe_publishable", "stripe_secret", "paypal_enabled", "paypal_client", "paypal_secret", "flutterwave_enabled", "flutterwave_public", "flutterwave_secret", "paystack_enabled", "paystack_public", "paystack_secret", "bank_enabled", "bank_details", "cod_enabled"]),
 }
 
@@ -933,6 +984,85 @@ def analytics_export():
         output.getvalue(),
         mimetype="text/csv",
         headers={"Content-Disposition": "attachment; filename=aluye-analytics.csv"},
+    )
+
+
+@admin_bp.route("/reviews", methods=["GET", "POST"])
+def reviews_admin():
+    db = get_db()
+    if request.method == "POST":
+        review_id = request.form.get("review_id")
+        action = request.form.get("action")
+        if action == "approve":
+            db.execute("UPDATE reviews SET status='approved' WHERE id=?", (review_id,))
+        elif action == "reject":
+            db.execute("UPDATE reviews SET status='rejected' WHERE id=?", (review_id,))
+        elif action == "delete":
+            db.execute("DELETE FROM reviews WHERE id=?", (review_id,))
+        db.commit()
+        record_activity(f"Review {action}: #{review_id}")
+        flash("Review updated.", "success")
+    rows = db.execute("SELECT * FROM reviews ORDER BY created_at DESC").fetchall()
+    return render_template(
+        "admin/reviews.html",
+        admin_section="reviews_admin",
+        reviews=rows,
+    )
+
+
+@admin_bp.get("/subscribers")
+def subscribers_admin():
+    rows = get_db().execute(
+        "SELECT * FROM subscribers ORDER BY created_at DESC"
+    ).fetchall()
+    return render_template(
+        "admin/subscribers.html",
+        admin_section="subscribers_admin",
+        subscribers=rows,
+    )
+
+
+@admin_bp.route("/abandoned", methods=["GET", "POST"])
+def abandoned_admin():
+    db = get_db()
+    if request.method == "POST":
+        cart_id = request.form.get("cart_id")
+        if request.form.get("action") == "delete":
+            db.execute("DELETE FROM abandoned_carts WHERE id=?", (cart_id,))
+        db.commit()
+        flash("Updated.", "success")
+    rows = db.execute(
+        "SELECT * FROM abandoned_carts ORDER BY created_at DESC"
+    ).fetchall()
+    return render_template(
+        "admin/abandoned.html",
+        admin_section="abandoned_admin",
+        carts=rows,
+    )
+
+
+@admin_bp.route("/returns", methods=["GET", "POST"])
+def returns_admin():
+    db = get_db()
+    if request.method == "POST":
+        req_id = request.form.get("return_id")
+        new_status = request.form.get("status")
+        note = request.form.get("admin_note", "")
+        if req_id and new_status:
+            db.execute(
+                "UPDATE return_requests SET status=?, admin_note=? WHERE id=?",
+                (new_status, note, req_id),
+            )
+            db.commit()
+            record_activity(f"Return request #{req_id} → {new_status}")
+            flash("Return request updated.", "success")
+    rows = db.execute(
+        "SELECT * FROM return_requests ORDER BY created_at DESC"
+    ).fetchall()
+    return render_template(
+        "admin/returns.html",
+        admin_section="returns_admin",
+        returns=rows,
     )
 
 
