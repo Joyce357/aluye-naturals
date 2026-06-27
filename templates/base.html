@@ -97,27 +97,27 @@
         <a href="{{ url_for('contact') }}" class="hidden min-h-11 items-center px-3 text-xs font-semibold lg:flex">Stores & services</a>
         <div class="relative">
           <button type="button" id="account-trigger" class="icon-button hidden sm:inline-flex" aria-label="Your account">{{ icon("user") }}</button>
-          <div id="account-dropdown" hidden class="absolute right-0 top-full z-50 mt-2 w-56 border border-sand bg-cream p-5 shadow-xl">
-            <p class="font-display text-lg font-semibold">Welcome to Aluyè</p>
-            <div class="mt-4 space-y-2">
-              <a href="{{ url_for('contact') }}" class="btn-primary block w-full text-center">Sign In</a>
-              <a href="{{ url_for('contact') }}" class="btn-secondary block w-full text-center">Create Account</a>
-              <button type="button" data-close-dropdown class="mt-1 w-full text-center text-sm text-bark underline">Continue as guest →</button>
-            </div>
+          <div id="account-dropdown" hidden class="absolute right-0 top-full z-[60] mt-2 w-56 border border-sand bg-cream p-5 shadow-xl">
+            {% if session.get('customer_id') %}
+              <p class="font-display text-lg font-semibold">Hello, {{ session.get('customer_name', '') }} 👋</p>
+              <div class="mt-4 space-y-2 text-sm">
+                <a href="{{ url_for('account') }}" class="block min-h-11 leading-[2.75rem] font-semibold hover:underline">My Account</a>
+                <a href="{{ url_for('wishlist_page') }}" class="block min-h-11 leading-[2.75rem] font-semibold hover:underline">My Wishlist</a>
+                <a href="{{ url_for('track_order') }}" class="block min-h-11 leading-[2.75rem] font-semibold hover:underline">Track Order</a>
+                <hr class="border-sand">
+                <a href="{{ url_for('logout') }}" class="block min-h-11 leading-[2.75rem] font-semibold text-error hover:underline">Sign Out</a>
+              </div>
+            {% else %}
+              <p class="font-display text-lg font-semibold">Welcome to Aluyè</p>
+              <div class="mt-4 space-y-2">
+                <a href="{{ url_for('login') }}" class="btn-primary block w-full text-center">Sign In</a>
+                <a href="{{ url_for('register') }}" class="btn-secondary block w-full text-center">Create Account</a>
+                <button type="button" data-close-dropdown class="mt-1 w-full text-center text-sm text-bark underline">Continue as guest →</button>
+              </div>
+            {% endif %}
           </div>
         </div>
-        <div class="relative">
-          <button type="button" id="wishlist-trigger" class="icon-button hidden sm:inline-flex" aria-label="Wishlist">{{ icon("heart") }}</button>
-          <div id="wishlist-dropdown" hidden class="absolute right-0 top-full z-50 mt-2 w-56 border border-sand bg-cream p-5 shadow-xl">
-            <p class="font-display text-lg font-semibold">Save your favourites</p>
-            <p class="mt-2 text-sm text-bark">Sign in to keep your wishlist across devices</p>
-            <div class="mt-4 space-y-2">
-              <a href="{{ url_for('contact') }}" class="btn-primary block w-full text-center">Sign In</a>
-              <a href="{{ url_for('contact') }}" class="btn-secondary block w-full text-center">Create Account</a>
-              <a href="{{ url_for('wishlist_page') }}" class="mt-1 block w-full text-center text-sm text-bark underline">Browse as guest →</a>
-            </div>
-          </div>
-        </div>
+        <a href="{{ url_for('wishlist_page') }}" class="icon-button hidden sm:inline-flex" aria-label="Wishlist">{{ icon("heart") }}</a>
         <button type="button" data-cart-trigger class="icon-button relative" aria-label="Shopping bag with {{ cart_count }} items">
           {{ icon("bag") }}
           <span data-cart-count {% if not cart_count %}hidden{% endif %} class="absolute right-0 top-0 flex size-5 items-center justify-center rounded-full bg-ink text-[0.625rem] font-bold text-white">{{ cart_count }}</span>
@@ -271,8 +271,8 @@
 
   <div id="toast" class="fixed right-4 top-24 z-[90] pointer-events-none" aria-live="polite"></div>
 
-  <div id="cart-drawer-overlay" hidden class="fixed inset-0 z-[60] bg-black/50 opacity-0 transition-opacity duration-300"></div>
-  <aside id="cart-drawer" hidden class="fixed inset-y-0 right-0 z-[61] flex w-full max-w-md flex-col bg-white shadow-2xl translate-x-full transition-transform duration-300">
+  <div id="cart-drawer-overlay" hidden class="fixed inset-0 z-[70] bg-black/50 opacity-0 transition-opacity duration-300"></div>
+  <aside id="cart-drawer" hidden class="fixed inset-y-0 right-0 z-[71] flex w-full max-w-md flex-col bg-white shadow-2xl translate-x-full transition-transform duration-300">
     <div class="flex min-h-16 items-center justify-between border-b border-sand px-6">
       <h2 class="font-display text-2xl font-semibold">Your Ritual</h2>
       <button type="button" data-drawer-close class="icon-button" aria-label="Close cart">{{ icon("close") }}</button>

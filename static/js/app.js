@@ -346,9 +346,8 @@ function setupDropdown(triggerId, dropdownId) {
   });
 }
 setupDropdown("account-trigger", "account-dropdown");
-setupDropdown("wishlist-trigger", "wishlist-dropdown");
 document.addEventListener("click", () => {
-  document.querySelectorAll("#account-dropdown, #wishlist-dropdown").forEach(d => d.hidden = true);
+  document.querySelectorAll("#account-dropdown").forEach(d => d.hidden = true);
 });
 
 /* ── Newsletter ── */
