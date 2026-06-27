@@ -296,13 +296,59 @@ document.querySelectorAll('form[action*="/cart/add/"]').forEach((form) => {
   });
 });
 
-/* ── Wishlist toggle (placeholder) ── */
-document.querySelectorAll("[data-wishlist]").forEach((button) => {
-  button.addEventListener("click", () => {
-    const active = button.getAttribute("aria-pressed") === "true";
-    button.setAttribute("aria-pressed", String(!active));
-    button.classList.toggle("text-clay", !active);
+/* ── Wishlist (localStorage persistence + solid black fill) ── */
+const WISHLIST_KEY = "aluye_wishlist";
+function getWishlist() {
+  try { return JSON.parse(localStorage.getItem(WISHLIST_KEY) || "[]"); } catch(_) { return []; }
+}
+function saveWishlist(list) { localStorage.setItem(WISHLIST_KEY, JSON.stringify(list)); }
+function initWishlistButtons() {
+  const wishlist = getWishlist();
+  document.querySelectorAll("[data-wishlist]").forEach((button) => {
+    const slug = button.dataset.slug || button.closest("[data-product-card]")?.querySelector("a[href*='/products/']")?.href?.split("/products/")[1] || "";
+    if (slug && wishlist.includes(slug)) {
+      button.setAttribute("aria-pressed", "true");
+    }
+    button.addEventListener("click", () => {
+      const currentSlug = button.dataset.slug || button.closest("[data-product-card]")?.querySelector("a[href*='/products/']")?.href?.split("/products/")[1] || "";
+      if (!currentSlug) return;
+      const active = button.getAttribute("aria-pressed") === "true";
+      button.setAttribute("aria-pressed", String(!active));
+      button.classList.add("heart-animate");
+      setTimeout(() => button.classList.remove("heart-animate"), 300);
+      let wl = getWishlist();
+      if (!active) {
+        if (!wl.includes(currentSlug)) wl.push(currentSlug);
+        showToast("Added to wishlist ✓");
+      } else {
+        wl = wl.filter(s => s !== currentSlug);
+        showToast("Removed from wishlist");
+      }
+      saveWishlist(wl);
+    });
   });
+}
+initWishlistButtons();
+
+/* ── Header dropdowns (account, wishlist) ── */
+function setupDropdown(triggerId, dropdownId) {
+  const trigger = document.querySelector("#" + triggerId);
+  const dropdown = document.querySelector("#" + dropdownId);
+  if (!trigger || !dropdown) return;
+  trigger.addEventListener("click", (e) => {
+    e.stopPropagation();
+    const isOpen = !dropdown.hidden;
+    document.querySelectorAll("[id$='-dropdown']").forEach(d => d.hidden = true);
+    dropdown.hidden = isOpen;
+  });
+  dropdown.querySelectorAll("[data-close-dropdown]").forEach(btn => {
+    btn.addEventListener("click", () => dropdown.hidden = true);
+  });
+}
+setupDropdown("account-trigger", "account-dropdown");
+setupDropdown("wishlist-trigger", "wishlist-dropdown");
+document.addEventListener("click", () => {
+  document.querySelectorAll("#account-dropdown, #wishlist-dropdown").forEach(d => d.hidden = true);
 });
 
 /* ── Newsletter ── */

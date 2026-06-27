@@ -31,6 +31,9 @@
   <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}">
   <style>
+    @keyframes heartbeat{0%{transform:scale(1)}50%{transform:scale(1.3)}100%{transform:scale(1)}}
+    [data-wishlist][aria-pressed="true"] svg{fill:#1a1a1a;stroke:#1a1a1a}
+    [data-wishlist].heart-animate svg{animation:heartbeat 0.3s ease}
     @media(max-width:767px){
       body{padding-bottom:4.5rem}
       #wa-container{bottom:5.5rem!important}
@@ -90,25 +93,35 @@
         <div id="search-dropdown" hidden class="absolute left-0 right-0 top-full z-50 mt-1 max-h-96 overflow-y-auto border border-sand bg-white shadow-xl"></div>
       </div>
 
-      <div class="flex flex-col items-end">
-        <div class="flex items-center justify-end">
-          <a href="{{ url_for('contact') }}" class="hidden min-h-11 items-center px-3 text-xs font-semibold lg:flex">Stores & services</a>
-          <a href="#" class="icon-button hidden sm:inline-flex" aria-label="Your account">{{ icon("user") }}</a>
-          <a href="#" class="icon-button hidden sm:inline-flex" aria-label="Wishlist">{{ icon("heart") }}</a>
-          <button type="button" data-cart-trigger class="icon-button relative" aria-label="Shopping bag with {{ cart_count }} items">
-            {{ icon("bag") }}
-            <span data-cart-count {% if not cart_count %}hidden{% endif %} class="absolute right-0 top-0 flex size-5 items-center justify-center rounded-full bg-ink text-[0.625rem] font-bold text-white">{{ cart_count }}</span>
-          </button>
+      <div class="flex items-center justify-end gap-1">
+        <a href="{{ url_for('contact') }}" class="hidden min-h-11 items-center px-3 text-xs font-semibold lg:flex">Stores & services</a>
+        <div class="relative">
+          <button type="button" id="account-trigger" class="icon-button hidden sm:inline-flex" aria-label="Your account">{{ icon("user") }}</button>
+          <div id="account-dropdown" hidden class="absolute right-0 top-full z-50 mt-2 w-56 border border-sand bg-cream p-5 shadow-xl">
+            <p class="font-display text-lg font-semibold">Welcome to Aluyè</p>
+            <div class="mt-4 space-y-2">
+              <a href="{{ url_for('contact') }}" class="btn-primary block w-full text-center">Sign In</a>
+              <a href="{{ url_for('contact') }}" class="btn-secondary block w-full text-center">Create Account</a>
+              <button type="button" data-close-dropdown class="mt-1 w-full text-center text-sm text-bark underline">Continue as guest →</button>
+            </div>
+          </div>
         </div>
-        <p class="hidden text-[0.65rem] font-semibold text-bark sm:block">
-          {% if cart_count and shipping_remaining %}
-            Add <span data-money data-price="{{ shipping_remaining }}">${{ shipping_remaining }}</span> more for free shipping
-          {% elif cart_count %}
-            Free shipping unlocked
-          {% else %}
-            Free shipping over <span data-money data-price="{{ free_shipping_threshold }}">${{ free_shipping_threshold }}</span>
-          {% endif %}
-        </p>
+        <div class="relative">
+          <button type="button" id="wishlist-trigger" class="icon-button hidden sm:inline-flex" aria-label="Wishlist">{{ icon("heart") }}</button>
+          <div id="wishlist-dropdown" hidden class="absolute right-0 top-full z-50 mt-2 w-56 border border-sand bg-cream p-5 shadow-xl">
+            <p class="font-display text-lg font-semibold">Save your favourites</p>
+            <p class="mt-2 text-sm text-bark">Sign in to keep your wishlist across devices</p>
+            <div class="mt-4 space-y-2">
+              <a href="{{ url_for('contact') }}" class="btn-primary block w-full text-center">Sign In</a>
+              <a href="{{ url_for('contact') }}" class="btn-secondary block w-full text-center">Create Account</a>
+              <a href="{{ url_for('wishlist_page') }}" class="mt-1 block w-full text-center text-sm text-bark underline">Browse as guest →</a>
+            </div>
+          </div>
+        </div>
+        <button type="button" data-cart-trigger class="icon-button relative" aria-label="Shopping bag with {{ cart_count }} items">
+          {{ icon("bag") }}
+          <span data-cart-count {% if not cart_count %}hidden{% endif %} class="absolute right-0 top-0 flex size-5 items-center justify-center rounded-full bg-ink text-[0.625rem] font-bold text-white">{{ cart_count }}</span>
+        </button>
       </div>
     </div>
 

@@ -177,7 +177,7 @@ def test_admin_login_protection_and_sections():
         "/admin/messages",
         "/admin/notifications",
         "/admin/homepage",
-        "/admin/section/settings",
+        "/admin/global-settings",
         "/admin/section/payments",
         "/admin/shipping",
         "/admin/discounts",

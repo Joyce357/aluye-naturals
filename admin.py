@@ -36,7 +36,7 @@ NAV_ITEMS = [
     ("messages", "Messages / Inbox"),
     ("notifications", "Notifications"),
     ("homepage", "Homepage Editor"),
-    ("settings", "Site Settings"),
+    ("global_settings", "Site Settings"),
     ("payments", "Payment Methods"),
     ("shipping", "Shipping & Delivery"),
     ("discounts", "Discount Codes"),
@@ -912,13 +912,45 @@ def homepage():
 
 
 SECTION_CONFIG = {
-    "settings": ("Site Settings", ["store_name", "tagline", "contact_email", "phone", "address", "whatsapp", "instagram", "tiktok", "facebook", "pinterest", "meta_title", "meta_description", "base_currency", "supported_currencies", "store_status", "maintenance_message", "instagram_token", "returns_policy"]),
     "payments": ("Payment Methods", ["stripe_enabled", "stripe_publishable", "stripe_secret", "paypal_enabled", "paypal_client", "paypal_secret", "flutterwave_enabled", "flutterwave_public", "flutterwave_secret", "paystack_enabled", "paystack_public", "paystack_secret", "bank_enabled", "bank_details", "cod_enabled"]),
+}
+
+SETTINGS_TABS = [
+    ("general", "General"),
+    ("branding", "Branding"),
+    ("contact", "Contact"),
+    ("social", "Social Media"),
+    ("homepage", "Homepage"),
+    ("store", "Store"),
+    ("seo", "SEO"),
+    ("newsletter", "Newsletter"),
+    ("footer", "Footer"),
+    ("integrations", "Integrations"),
+]
+
+SETTINGS_DEFAULTS = {
+    "store_name": "Aluyè Naturals",
+    "tagline": "Body · Mind · Soul",
+    "store_status": "live",
+    "base_currency": "USD",
+    "free_shipping_threshold": "50",
+    "signup_heading": "Get 15% off your first ritual",
+    "signup_subheading": "Join for product launches, ingredient guides and members-only offers.",
+    "copyright_text": "© 2026 Aluyè Naturals. Body. Mind. Soul.",
+    "footer_description": "Natural skin, hair, body and beard care rooted in West African ingredients and everyday ritual.",
+    "response_time": "We aim to reply within two business days.",
+    "returns_window": "30",
+    "gift_wrap_price": "3",
+    "low_stock_threshold": "5",
+    "welcome_email_subject": "Welcome to the ritual 🌿",
+    "welcome_discount_code": "RITUAL15",
 }
 
 
 @admin_bp.route("/section/<section>", methods=["GET", "POST"])
 def configurable_section(section):
+    if section == "settings":
+        return redirect(url_for("admin.global_settings"))
     if section not in SECTION_CONFIG:
         return redirect(url_for("admin.dashboard"))
     if session.get("admin_role") != "Super Admin":
@@ -956,6 +988,49 @@ def configurable_section(section):
         title=title,
         fields=fields,
         settings=load_setting(section, {}) or {},
+    )
+
+
+@admin_bp.route("/global-settings", methods=["GET", "POST"])
+def global_settings():
+    if session.get("admin_role") != "Super Admin":
+        flash("Only a Super Admin can access settings.", "error")
+        return redirect(url_for("admin.dashboard"))
+
+    if request.method == "POST":
+        tab = request.form.get("tab", "general")
+        settings = load_setting("settings", {}) or {}
+        homepage = load_setting("homepage", {}) or {}
+        target = homepage if tab == "homepage" else settings
+        for key, value in request.form.items():
+            if key == "tab":
+                continue
+            target[key] = value
+        checkbox_fields = [
+            "new_arrivals", "best_sellers", "brand_story", "ingredients", "journal",
+            "welcome_email_enabled", "gift_wrap_enabled",
+        ]
+        for field in checkbox_fields:
+            if tab in ("homepage", "store", "newsletter"):
+                target[field] = field in request.form
+        if tab == "homepage":
+            save_setting("homepage", homepage)
+        else:
+            save_setting("settings", settings)
+        record_activity(f"Updated {tab} settings")
+        flash("Settings saved ✓", "success")
+        return redirect(url_for("admin.global_settings"))
+
+    all_settings = {**SETTINGS_DEFAULTS}
+    all_settings.update(load_setting("settings", {}) or {})
+    all_settings.update(load_setting("homepage", {}) or {})
+
+    return render_template(
+        "admin/global_settings.html",
+        admin_section="settings",
+        tabs=SETTINGS_TABS,
+        s=all_settings,
+        defaults=SETTINGS_DEFAULTS,
     )
 
 

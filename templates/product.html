@@ -57,7 +57,7 @@
           </div>
           <button name="next" value="{{ url_for('checkout') }}" class="mt-3 min-h-12 w-full border border-black bg-white text-sm font-bold text-black hover:bg-neutral-100">Shop now</button>
         </form>
-        <button type="button" data-wishlist aria-pressed="false" class="mt-3 inline-flex min-h-12 w-full items-center justify-center gap-2 border border-ink text-sm font-semibold">{{ icon("heart") }} Add to wishlist</button>
+        <button type="button" data-wishlist data-slug="{{ product.slug }}" aria-pressed="false" class="mt-3 inline-flex min-h-12 w-full items-center justify-center gap-2 border border-ink text-sm font-semibold">{{ icon("heart") }} Add to wishlist</button>
 
         {# Ingredient chips (Feature 22) #}
         <div class="mt-5 flex flex-wrap gap-2">

@@ -32,7 +32,7 @@
   <div class="relative aspect-[4/5] overflow-hidden border border-neutral-200 bg-white">
     <span class="absolute left-3 top-3 z-10 bg-black px-2.5 py-1.5 text-[0.625rem] font-semibold uppercase tracking-[0.12em] text-white">{{ product.badge }}</span>
     <span class="absolute bottom-3 left-3 z-10 bg-white px-3 py-2 text-sm font-bold tabular-nums shadow" data-money data-price="{{ product.price }}">${{ product.price }}</span>
-    <button type="button" data-wishlist aria-pressed="false" aria-label="Add {{ product.name }} to wishlist" class="icon-button absolute right-2 top-2 z-10 bg-white/90">
+    <button type="button" data-wishlist data-slug="{{ product.slug }}" aria-pressed="false" aria-label="Add {{ product.name }} to wishlist" class="icon-button absolute right-2 top-2 z-10 bg-white/90">
       {{ icon("heart") }}
     </button>
     <a href="{{ url_for('product_detail', slug=product.slug) }}" aria-label="View {{ product.name }}">
