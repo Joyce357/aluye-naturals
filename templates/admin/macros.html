@@ -1,0 +1,65 @@
+{# Reusable admin components #}
+
+{% macro stats_card(label, value, detail="") %}
+<div class="border border-sand bg-white p-5">
+  <p class="text-xs font-bold uppercase tracking-wider text-bark">{{ label }}</p>
+  <p class="mt-2 font-display text-3xl font-semibold">{{ value }}</p>
+  {% if detail %}<p class="mt-1 text-xs text-bark">{{ detail }}</p>{% endif %}
+</div>
+{% endmacro %}
+
+{% macro status_badge(status) %}
+{% set colors = {
+  "active": "bg-success text-white",
+  "approved": "bg-success text-white",
+  "replied": "bg-success text-white",
+  "Delivered": "bg-success text-white",
+  "Processed": "bg-botanical text-white",
+  "Shipped": "bg-botanical text-white",
+  "Processing": "bg-shea text-ink",
+  "pending": "bg-sand text-ink",
+  "Pending": "bg-sand text-ink",
+  "unread": "bg-clay text-white",
+  "rejected": "bg-error text-white",
+  "Rejected": "bg-error text-white",
+  "Cancelled": "bg-error text-white",
+  "draft": "bg-neutral-200 text-ink",
+  "read": "bg-neutral-200 text-ink",
+  "archived": "bg-neutral-200 text-ink",
+} %}
+<span class="inline-block px-2 py-0.5 text-[0.65rem] font-bold uppercase {{ colors.get(status, 'bg-sand text-ink') }}">{{ status }}</span>
+{% endmacro %}
+
+{% macro empty_state(icon_path, heading, message, button_text="", button_url="") %}
+<div class="border border-sand bg-white px-6 py-16 text-center">
+  <svg class="mx-auto size-12 text-bark" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2"><path d="{{ icon_path }}"/></svg>
+  <h2 class="mt-5 font-display text-3xl font-semibold">{{ heading }}</h2>
+  <p class="mx-auto mt-3 max-w-md text-sm text-bark">{{ message }}</p>
+  {% if button_text %}<a href="{{ button_url }}" class="btn-primary mt-6 inline-flex">{{ button_text }}</a>{% endif %}
+</div>
+{% endmacro %}
+
+{% macro page_header(eyebrow, title, action_text="", action_url="") %}
+<div class="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+  <div>
+    <p class="eyebrow text-bark">{{ eyebrow }}</p>
+    <h1 class="mt-2 font-display text-4xl font-semibold md:text-5xl">{{ title }}</h1>
+  </div>
+  {% if action_text %}
+    <a href="{{ action_url }}" class="btn-primary shrink-0">{{ action_text }}</a>
+  {% endif %}
+</div>
+{% endmacro %}
+
+{% macro form_field(name, label, value="", type="text", required=false, placeholder="") %}
+<div>
+  <label for="{{ name }}" class="text-sm font-semibold">{{ label }}</label>
+  <input id="{{ name }}" name="{{ name }}" type="{{ type }}" value="{{ value }}" {% if required %}required{% endif %} {% if placeholder %}placeholder="{{ placeholder }}"{% endif %} class="mt-1 min-h-12 w-full border border-sand bg-cream px-4">
+</div>
+{% endmacro %}
+
+{% macro confirm_delete(action_url, item_name="this item") %}
+<form method="post" action="{{ action_url }}" class="inline" onsubmit="return confirm('Delete {{ item_name }}? This cannot be undone.')">
+  <button class="text-xs font-semibold text-error underline">Delete</button>
+</form>
+{% endmacro %}

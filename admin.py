@@ -28,25 +28,37 @@ PRODUCTS_REF = []
 CATEGORIES_REF = []
 BLOG_POSTS_REF = []
 
-NAV_ITEMS = [
-    ("dashboard", "Dashboard"),
-    ("products", "Products"),
-    ("orders", "Orders"),
-    ("reviews_admin", "Reviews"),
-    ("messages", "Messages / Inbox"),
-    ("notifications", "Notifications"),
-    ("homepage", "Homepage Editor"),
-    ("global_settings", "Site Settings"),
-    ("payments", "Payment Methods"),
-    ("shipping", "Shipping & Delivery"),
-    ("discounts", "Discount Codes"),
-    ("journal", "Blog / Journal"),
-    ("analytics", "Analytics"),
-    ("subscribers_admin", "Subscribers"),
-    ("abandoned_admin", "Abandoned Carts"),
-    ("returns_admin", "Returns"),
-    ("account", "Account Settings"),
+NAV_GROUPS = [
+    ("core", "", [
+        ("dashboard", "Dashboard"),
+        ("global_settings", "Site Settings"),
+    ]),
+    ("commerce", "Commerce", [
+        ("products", "Products"),
+        ("orders", "Orders"),
+        ("returns_admin", "Returns"),
+        ("abandoned_admin", "Abandoned Carts"),
+        ("discounts", "Discount Codes"),
+        ("shipping", "Shipping & Delivery"),
+        ("payments", "Payment Methods"),
+    ]),
+    ("marketing", "Marketing", [
+        ("subscribers_admin", "Subscribers"),
+        ("analytics", "Analytics"),
+    ]),
+    ("content", "Content", [
+        ("homepage", "Homepage Editor"),
+        ("journal", "Blog / Journal"),
+        ("reviews_admin", "Reviews"),
+        ("messages", "Messages / Inbox"),
+        ("notifications", "Notifications"),
+    ]),
+    ("system", "System", [
+        ("account", "Admin Users"),
+    ]),
 ]
+
+NAV_ITEMS = [(key, label) for _, _, items in NAV_GROUPS for key, label in items]
 
 
 def init_admin(app, products, categories, blog_posts):
@@ -468,6 +480,7 @@ def inject_admin_context():
     db = get_db()
     return {
         "admin_nav": NAV_ITEMS,
+        "admin_nav_groups": NAV_GROUPS,
         "admin_user": {
             "name": session.get("admin_name", "Administrator"),
             "role": session.get("admin_role", "Super Admin"),

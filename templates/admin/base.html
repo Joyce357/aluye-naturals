@@ -9,6 +9,10 @@
   <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}">
   <style>
+    .nav-group summary{list-style:none;cursor:pointer}
+    .nav-group summary::-webkit-details-marker{display:none}
+    .nav-group summary::after{content:"›";float:right;transition:transform .2s;font-size:1rem;opacity:.4}
+    .nav-group[open] summary::after{transform:rotate(90deg)}
     @media(max-width:767px){
       .admin-main-content{padding-bottom:5rem}
       .admin-table-responsive{display:block}
@@ -18,146 +22,152 @@
       .admin-table-responsive td{display:block;padding:0.25rem 0;border:none}
       .admin-table-responsive td:before{content:attr(data-label);display:block;font-size:0.65rem;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:#594a3b}
     }
-    #admin-more-sheet{transition:transform 0.3s ease}
   </style>
   <script src="{{ url_for('static', filename='js/admin.js') }}" defer></script>
 </head>
 <body class="bg-[#f9f6f1] text-ink">
   <div class="min-h-dvh lg:grid lg:grid-cols-[17rem_1fr]">
+
+    {# ═══ SIDEBAR ═══ #}
     <aside id="admin-sidebar" class="fixed inset-y-0 left-0 z-50 hidden w-72 overflow-y-auto bg-[#1a1a1a] text-white lg:static lg:block lg:w-auto">
       <div class="flex min-h-20 items-center justify-between border-b border-white/15 px-6">
-        <a href="{{ url_for('admin.dashboard') }}"><span class="font-display text-2xl font-semibold">Aluyè Naturals</span><span class="block text-[0.6rem] uppercase tracking-[0.22em] text-white/55">Administration</span></a>
-        <button type="button" data-admin-menu-close class="flex size-11 items-center justify-center lg:hidden" aria-label="Close navigation"><svg class="size-5" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="m5 5 14 14M19 5 5 19"/></svg></button>
+        <a href="{{ url_for('admin.dashboard') }}">
+          <span class="font-display text-2xl font-semibold">Aluyè Naturals</span>
+          <span class="block text-[0.6rem] uppercase tracking-[0.22em] text-white/55">Administration</span>
+        </a>
+        <button type="button" data-admin-menu-close class="flex size-11 items-center justify-center lg:hidden" aria-label="Close navigation">
+          <svg class="size-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="m5 5 14 14M19 5 5 19"/></svg>
+        </button>
       </div>
-      <nav class="space-y-1 p-4" aria-label="Admin navigation">
-        {% for key, label in admin_nav %}
-          {% if key == "payments" %}
-            {% set href = url_for('admin.configurable_section', section=key) %}
+
+      <nav class="p-3" aria-label="Admin navigation">
+        {% for group_key, group_label, group_items in admin_nav_groups %}
+
+          {# Core items — no group heading #}
+          {% if not group_label %}
+            {% for key, label in group_items %}
+              {% if key == "payments" %}{% set href = url_for('admin.configurable_section', section=key) %}
+              {% else %}{% set href = url_for('admin.' + key) %}{% endif %}
+              <a href="{{ href }}" class="flex min-h-10 items-center justify-between rounded px-4 text-sm transition {% if admin_section == key %}bg-white/10 text-white font-semibold{% else %}text-white/60 hover:bg-white/5 hover:text-white{% endif %}">
+                {{ label }}
+              </a>
+            {% endfor %}
+            <div class="my-3 border-t border-white/10"></div>
+
+          {# Grouped items — collapsible #}
           {% else %}
-            {% set href = url_for('admin.' + key) %}
+            {% set group_active = admin_section in (group_items | map(attribute=0) | list) %}
+            <details class="nav-group mt-1" {% if group_active %}open{% endif %}>
+              <summary class="flex min-h-9 items-center rounded px-4 text-[0.65rem] font-bold uppercase tracking-[0.12em] text-white/40 hover:text-white/60">{{ group_label }}</summary>
+              <div class="ml-2 mt-1 space-y-0.5 border-l border-white/10 pl-2">
+                {% for key, label in group_items %}
+                  {% if key == "payments" %}{% set href = url_for('admin.configurable_section', section=key) %}
+                  {% else %}{% set href = url_for('admin.' + key) %}{% endif %}
+                  <a href="{{ href }}" class="flex min-h-9 items-center justify-between rounded px-3 text-sm transition {% if admin_section == key %}bg-white/10 text-white font-semibold{% else %}text-white/55 hover:bg-white/5 hover:text-white{% endif %}">
+                    {{ label }}
+                    {% if key == "messages" and admin_unread_messages %}<span class="rounded-full bg-clay px-2 py-0.5 text-[0.6rem] font-bold">{{ admin_unread_messages }}</span>{% endif %}
+                    {% if key == "notifications" and admin_unread_notifications %}<span class="rounded-full bg-clay px-2 py-0.5 text-[0.6rem] font-bold">{{ admin_unread_notifications }}</span>{% endif %}
+                  </a>
+                {% endfor %}
+              </div>
+            </details>
           {% endif %}
-          <a href="{{ href }}" class="flex min-h-11 items-center justify-between border-l-2 px-4 text-sm transition {% if admin_section == key %}border-shea bg-white/10 text-white{% else %}border-transparent text-white/65 hover:bg-white/5 hover:text-white{% endif %}">
-            <span>{{ label }}</span>
-            {% if key == "messages" and admin_unread_messages %}<span class="rounded-full bg-clay px-2 py-0.5 text-[0.65rem] font-bold">{{ admin_unread_messages }}</span>{% endif %}
-          </a>
         {% endfor %}
       </nav>
-      <div class="m-4 border border-white/15 p-4 text-xs text-white/65">
+
+      <div class="m-3 border border-white/10 p-4 text-xs text-white/55">
         <p class="font-semibold text-white">{{ admin_user.name }}</p>
         <p class="mt-1">{{ admin_user.role }}</p>
-        <a href="{{ url_for('admin.logout') }}" class="mt-4 inline-block underline">Sign out</a>
+        <a href="{{ url_for('admin.logout') }}" class="mt-3 inline-block underline hover:text-white">Sign out</a>
       </div>
     </aside>
 
+    {# ═══ MAIN CONTENT ═══ #}
     <div class="min-w-0">
-      <header class="sticky top-0 z-30 flex min-h-16 items-center justify-between border-b border-sand bg-[#f9f6f1]/95 px-4 backdrop-blur md:px-8">
+      <header class="sticky top-0 z-30 flex min-h-14 items-center justify-between border-b border-sand bg-[#f9f6f1]/95 px-4 backdrop-blur md:px-8">
         <div class="flex items-center gap-3">
-          <button type="button" data-admin-menu-open class="flex size-11 items-center justify-center border border-sand lg:hidden" aria-label="Open navigation"><svg class="size-5" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
-          <div><p class="text-xs uppercase tracking-wider text-bark">Store administration</p><p class="font-semibold">{{ admin_user.name }}</p></div>
+          <button type="button" data-admin-menu-open class="flex size-10 items-center justify-center border border-sand lg:hidden" aria-label="Open navigation">
+            <svg class="size-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
+          </button>
+          <div>
+            <p class="text-[0.6rem] uppercase tracking-wider text-bark">Administration</p>
+            <p class="text-sm font-semibold">{{ admin_user.name }}</p>
+          </div>
         </div>
         <div class="flex items-center gap-2">
-          <a href="{{ url_for('admin.notifications') }}" class="relative flex size-11 items-center justify-center border border-sand bg-white" aria-label="Notifications"><svg class="size-5" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9"/><path d="M10 21h4"/></svg>{% if admin_unread_notifications %}<span class="absolute -right-1 -top-1 flex size-5 items-center justify-center rounded-full bg-clay text-[0.6rem] font-bold text-white">{{ admin_unread_notifications }}</span>{% endif %}</a>
-          <a href="{{ url_for('home') }}" class="hidden min-h-11 items-center border border-ink px-4 text-xs font-bold uppercase tracking-wide sm:flex">View store</a>
+          <a href="{{ url_for('admin.notifications') }}" class="relative flex size-10 items-center justify-center border border-sand bg-white" aria-label="Notifications">
+            <svg class="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9"/><path d="M10 21h4"/></svg>
+            {% if admin_unread_notifications %}<span class="absolute -right-1 -top-1 flex size-4 items-center justify-center rounded-full bg-clay text-[0.5rem] font-bold text-white">{{ admin_unread_notifications }}</span>{% endif %}
+          </a>
+          <a href="{{ url_for('home') }}" class="hidden min-h-10 items-center border border-ink px-3 text-xs font-bold uppercase tracking-wide sm:flex" target="_blank">View store</a>
         </div>
       </header>
+
       {% with messages = get_flashed_messages(with_categories=true) %}
-        {% if messages %}<div class="fixed right-4 top-20 z-[70] space-y-2" aria-live="polite">{% for category, message in messages %}<div class="max-w-sm border bg-white px-5 py-4 text-sm font-semibold shadow-xl {% if category == 'error' %}border-error text-error{% else %}border-success text-success{% endif %}">{{ message }}</div>{% endfor %}</div>{% endif %}
+        {% if messages %}
+          <div class="fixed right-4 top-16 z-[70] space-y-2" aria-live="polite">
+            {% for category, message in messages %}
+              <div class="max-w-sm border bg-white px-5 py-4 text-sm font-semibold shadow-xl {% if category == 'error' %}border-error text-error{% else %}border-success text-success{% endif %}">{{ message }}</div>
+            {% endfor %}
+          </div>
+        {% endif %}
       {% endwith %}
-      <main class="admin-main-content p-4 md:p-8 xl:p-10">{% block content %}{% endblock %}</main>
+
+      <main class="admin-main-content p-4 md:p-8 xl:p-10">
+        {% block content %}{% endblock %}
+      </main>
     </div>
   </div>
 
-  {# Mobile Admin Bottom Nav #}
-  <nav id="admin-bottom-nav" class="fixed inset-x-0 bottom-0 z-50 hidden bg-[#1a1a1a] md:hidden" aria-label="Admin mobile navigation" style="height:64px">
+  {# ═══ MOBILE BOTTOM NAV ═══ #}
+  <nav id="admin-bottom-nav" class="fixed inset-x-0 bottom-0 z-50 hidden bg-[#1a1a1a] md:hidden" style="height:60px">
     <div class="flex h-full items-center justify-around">
-      {% set bottom_items = [
+      {% set mobile_items = [
         ("dashboard", "Home", "M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"),
         ("products", "Products", "M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"),
         ("orders", "Orders", "M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"),
-        ("messages", "Messages", "M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"),
-        ("notifications", "Alerts", "M18 8a6 6 0 00-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4"),
-        ("homepage", "Editor", "M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"),
+        ("messages", "Inbox", "M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"),
+        ("global_settings", "Settings", "M12 15a3 3 0 100-6 3 3 0 000 6zM19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"),
       ] %}
-      {% for key, label, path in bottom_items %}
-        {% if key in ["settings", "payments"] %}
-          {% set href = url_for('admin.configurable_section', section=key) %}
-        {% else %}
-          {% set href = url_for('admin.' + key) %}
-        {% endif %}
-        <a href="{{ href }}" class="flex flex-col items-center gap-1 px-2 {% if admin_section == key %}text-white{% else %}text-white/40{% endif %}">
-          {% if admin_section == key %}<span class="absolute top-1 h-1 w-4 rounded-full bg-shea"></span>{% endif %}
-          <svg class="size-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="{{ path }}"/></svg>
-          <span style="font-size:10px">{{ label }}</span>
+      {% for key, label, path in mobile_items %}
+        <a href="{{ url_for('admin.' + key) }}" class="flex flex-col items-center gap-0.5 px-1 {% if admin_section == key %}text-white{% else %}text-white/35{% endif %}">
+          <svg class="size-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="{{ path }}"/></svg>
+          <span style="font-size:9px;letter-spacing:0.02em">{{ label }}</span>
         </a>
       {% endfor %}
-      <a href="{{ url_for('admin.global_settings') }}" class="flex flex-col items-center gap-1 px-2 {% if admin_section == 'settings' %}text-white{% else %}text-white/40{% endif %}">
-        <svg class="size-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M12 15a3 3 0 100-6 3 3 0 000 6z"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
-        <span style="font-size:10px">Settings</span>
-      </a>
-      <button type="button" id="admin-more-btn" class="flex flex-col items-center gap-1 px-2 text-white/40">
-        <svg class="size-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg>
-        <span style="font-size:10px">More</span>
+      <button type="button" id="admin-more-btn" class="flex flex-col items-center gap-0.5 px-1 text-white/35">
+        <svg class="size-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg>
+        <span style="font-size:9px">More</span>
       </button>
     </div>
   </nav>
 
-  {# More slide-up sheet #}
+  {# ═══ MORE SLIDE-UP SHEET ═══ #}
   <div id="admin-more-overlay" hidden class="fixed inset-0 z-[60] bg-black/50 opacity-0 transition-opacity duration-300 md:hidden"></div>
   <div id="admin-more-sheet" hidden class="fixed inset-x-0 bottom-0 z-[61] translate-y-full rounded-t-2xl bg-[#1a1a1a] text-white md:hidden" style="max-height:60vh;overflow-y:auto">
     <div class="flex justify-center py-3"><div class="h-1 w-10 rounded-full bg-white/30"></div></div>
-    <nav class="space-y-1 px-4 pb-8">
-      {% set more_items = [
-        ("account", "Account Settings"),
-        ("journal", "Blog / Journal"),
-        ("analytics", "Analytics"),
-        ("reviews_admin", "Reviews"),
-        ("subscribers_admin", "Subscribers"),
-        ("abandoned_admin", "Abandoned Carts"),
-        ("returns_admin", "Returns"),
-        ("discounts", "Discount Codes"),
-        ("shipping", "Shipping & Delivery"),
-        ("payments", "Payment Methods"),
-      ] %}
-      {% for key, label in more_items %}
-        {% if key in ["settings", "payments"] %}
-          {% set href = url_for('admin.configurable_section', section=key) %}
-        {% else %}
-          {% set href = url_for('admin.' + key) %}
+    <nav class="px-4 pb-8">
+      {% for group_key, group_label, group_items in admin_nav_groups %}
+        {% if group_label %}
+          <p class="mt-4 mb-2 px-3 text-[0.6rem] font-bold uppercase tracking-[0.12em] text-white/30">{{ group_label }}</p>
+          {% for key, label in group_items %}
+            {% if key == "payments" %}{% set href = url_for('admin.configurable_section', section=key) %}
+            {% else %}{% set href = url_for('admin.' + key) %}{% endif %}
+            <a href="{{ href }}" class="flex min-h-11 items-center border-b border-white/5 px-3 text-sm {% if admin_section == key %}text-white font-semibold{% else %}text-white/55{% endif %}">{{ label }}</a>
+          {% endfor %}
         {% endif %}
-        <a href="{{ href }}" class="flex min-h-12 items-center border-b border-white/10 px-4 text-sm {% if admin_section == key %}text-white font-semibold{% else %}text-white/65{% endif %}">{{ label }}</a>
       {% endfor %}
-      <a href="{{ url_for('admin.logout') }}" class="flex min-h-12 items-center px-4 text-sm text-error">Sign out</a>
+      <a href="{{ url_for('admin.logout') }}" class="mt-4 flex min-h-11 items-center px-3 text-sm text-error">Sign out</a>
     </nav>
   </div>
 
   <script>
-    // Show bottom nav on mobile
-    if (window.innerWidth < 768) {
-      document.querySelector("#admin-bottom-nav")?.classList.remove("hidden");
-    }
-    window.addEventListener("resize", () => {
-      const nav = document.querySelector("#admin-bottom-nav");
-      if (nav) nav.classList.toggle("hidden", window.innerWidth >= 768);
-    });
-    // More sheet
-    const moreBtn = document.querySelector("#admin-more-btn");
-    const moreOverlay = document.querySelector("#admin-more-overlay");
-    const moreSheet = document.querySelector("#admin-more-sheet");
-    function openMore() {
-      moreOverlay.hidden = false;
-      moreSheet.hidden = false;
-      requestAnimationFrame(() => {
-        moreOverlay.classList.remove("opacity-0");
-        moreSheet.classList.remove("translate-y-full");
-      });
-    }
-    function closeMore() {
-      moreOverlay.classList.add("opacity-0");
-      moreSheet.classList.add("translate-y-full");
-      setTimeout(() => { moreOverlay.hidden = true; moreSheet.hidden = true; }, 300);
-    }
-    moreBtn?.addEventListener("click", openMore);
-    moreOverlay?.addEventListener("click", closeMore);
+    if(window.innerWidth<768){document.querySelector("#admin-bottom-nav")?.classList.remove("hidden")}
+    window.addEventListener("resize",()=>{const n=document.querySelector("#admin-bottom-nav");if(n)n.classList.toggle("hidden",window.innerWidth>=768)});
+    const moreBtn=document.querySelector("#admin-more-btn"),moreOverlay=document.querySelector("#admin-more-overlay"),moreSheet=document.querySelector("#admin-more-sheet");
+    function openMore(){moreOverlay.hidden=false;moreSheet.hidden=false;requestAnimationFrame(()=>{moreOverlay.classList.remove("opacity-0");moreSheet.classList.remove("translate-y-full")})}
+    function closeMore(){moreOverlay.classList.add("opacity-0");moreSheet.classList.add("translate-y-full");setTimeout(()=>{moreOverlay.hidden=true;moreSheet.hidden=true},300)}
+    moreBtn?.addEventListener("click",openMore);moreOverlay?.addEventListener("click",closeMore);
   </script>
 </body>
 </html>
