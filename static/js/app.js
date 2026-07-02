@@ -4,6 +4,16 @@ const menuButton = document.querySelector("[data-menu-open]");
 const menuClose = document.querySelector("[data-menu-close]");
 const cartCountEls = document.querySelectorAll("[data-cart-count]");
 let lastTrigger = null;
+const bodyScrollLocks = new Set();
+
+function setBodyScrollLock(key, locked) {
+  if (locked) {
+    bodyScrollLocks.add(key);
+  } else {
+    bodyScrollLocks.delete(key);
+  }
+  body.classList.toggle("overflow-hidden", bodyScrollLocks.size > 0);
+}
 
 const currencyOptions = {
   USD: { rate: 1, locale: "en-US" },
@@ -65,7 +75,7 @@ function openPanel(panel, trigger) {
   if (!panel) return;
   lastTrigger = trigger;
   panel.hidden = false;
-  body.classList.add("overflow-hidden");
+  setBodyScrollLock(panel.id || "panel", true);
   requestAnimationFrame(() => panel.classList.remove("opacity-0"));
   panel.querySelector("button, input, a")?.focus();
 }
@@ -75,7 +85,7 @@ function closePanel(panel) {
   panel.classList.add("opacity-0");
   window.setTimeout(() => {
     panel.hidden = true;
-    body.classList.remove("overflow-hidden");
+    setBodyScrollLock(panel.id || "panel", false);
     lastTrigger?.focus();
   }, 200);
 }
@@ -85,7 +95,6 @@ menuClose?.addEventListener("click", () => closePanel(menu));
 document.addEventListener("keydown", (event) => {
   if (event.key !== "Escape") return;
   if (menu && !menu.hidden) closePanel(menu);
-  if (drawerOpen) closeDrawer();
 });
 
 document.querySelectorAll("[data-currency-selector]").forEach((selector) => {
@@ -119,53 +128,80 @@ function updateCartCount(count) {
   });
 }
 
-/* ── Cart Drawer (Feature 2) ── */
-const drawer = document.querySelector("#cart-drawer");
-const drawerOverlay = document.querySelector("#cart-drawer-overlay");
-const drawerBody = document.querySelector("#cart-drawer-body");
-const drawerFooter = document.querySelector("#cart-drawer-footer");
-let drawerOpen = false;
+/* ── Cart Drawer ── */
+const cartState = {
+  initialized: false,
+  open: false,
+  drawer: null,
+  overlay: null,
+  body: null,
+  footer: null,
+  items: [],
+  refreshId: 0,
+};
 
-function openDrawer() {
-  if (!drawer) return;
-  drawerOpen = true;
-  drawer.classList.remove("pointer-events-none");
-  drawerOverlay.classList.remove("pointer-events-none");
-  body.classList.add("overflow-hidden");
-  drawer.classList.remove("translate-x-full");
-  drawerOverlay.classList.remove("opacity-0");
-  refreshDrawer();
+function applyCartState() {
+  const { drawer, overlay, open } = cartState;
+  if (!drawer || !overlay) return;
+
+  drawer.hidden = false;
+  overlay.hidden = false;
+  drawer.toggleAttribute("inert", !open);
+  drawer.style.transform = open ? "translateX(0)" : "translateX(100%)";
+  overlay.style.opacity = open ? "1" : "0";
+  overlay.style.pointerEvents = open ? "auto" : "none";
+  drawer.setAttribute("aria-hidden", String(!open));
+  overlay.setAttribute("aria-hidden", String(!open));
+
+  if (!open) {
+    drawer.hidden = true;
+    overlay.hidden = true;
+  }
+  setBodyScrollLock("cart", open);
 }
 
-function closeDrawer() {
-  if (!drawer) return;
-  drawerOpen = false;
-  drawer.classList.add("translate-x-full");
-  drawerOverlay.classList.add("opacity-0");
-  setTimeout(() => {
-    drawer.classList.add("pointer-events-none");
-    drawerOverlay.classList.add("pointer-events-none");
-    body.classList.remove("overflow-hidden");
-  }, 300);
+function openCart() {
+  if (!cartState.drawer) return;
+  if (!cartState.open) {
+    cartState.open = true;
+    applyCartState();
+  }
+  refreshCart();
 }
 
-function refreshDrawer() {
+function closeCart() {
+  if (!cartState.drawer) return;
+  cartState.open = false;
+  cartState.refreshId += 1;
+  applyCartState();
+}
+
+function toggleCart() {
+  if (!cartState.drawer) return;
+  cartState.open ? closeCart() : openCart();
+}
+
+function refreshCart() {
+  const requestId = ++cartState.refreshId;
   fetch("/api/cart", { headers: { "X-Requested-With": "XMLHttpRequest" } })
     .then((r) => r.json())
-    .then(renderDrawer);
+    .then((data) => {
+      if (requestId === cartState.refreshId) renderCart(data);
+    });
 }
 
-function renderDrawer(data) {
+function renderCart(data) {
   updateCartCount(data.cart_count);
-  if (!drawerBody) return;
+  cartState.items = data.items || [];
+  if (!cartState.body) return;
   if (!data.items.length) {
-    drawerBody.innerHTML =
+    cartState.body.innerHTML =
       '<p class="py-12 text-center text-bark">Your bag is empty.</p>';
-    if (drawerFooter) drawerFooter.hidden = true;
+    if (cartState.footer) cartState.footer.hidden = true;
     return;
   }
   const code = getCurrency();
-  drawerBody.innerHTML = data.items
+  cartState.body.innerHTML = data.items
     .map(
       (item) => `
     <article class="flex gap-4 border-b border-sand py-4">
@@ -187,8 +223,8 @@ function renderDrawer(data) {
     )
     .join("");
 
-  if (drawerFooter) {
-    drawerFooter.hidden = false;
+  if (cartState.footer) {
+    cartState.footer.hidden = false;
     const subtotalEl = document.querySelector("#drawer-subtotal");
     const shippingText = document.querySelector("#drawer-shipping-text");
     const shippingBar = document.querySelector("#drawer-shipping-bar");
@@ -202,29 +238,9 @@ function renderDrawer(data) {
       shippingBar.style.width = "100%";
     }
   }
-
-  drawerBody.querySelectorAll("[data-drawer-qty]").forEach((btn) => {
-    btn.addEventListener("click", () => {
-      const slug = btn.dataset.drawerQty;
-      const delta = Number(btn.dataset.delta);
-      const item = data.items.find((i) => i.slug === slug);
-      if (!item) return;
-      const newQty = Math.max(0, Math.min(10, item.quantity + delta));
-      if (newQty === 0) {
-        drawerCartAction(`/cart/remove/${slug}`, "POST");
-      } else {
-        drawerCartAction(`/cart/update/${slug}`, "POST", `quantity=${newQty}`);
-      }
-    });
-  });
-  drawerBody.querySelectorAll("[data-drawer-remove]").forEach((btn) => {
-    btn.addEventListener("click", () => {
-      drawerCartAction(`/cart/remove/${btn.dataset.drawerRemove}`, "POST");
-    });
-  });
 }
 
-function drawerCartAction(url, method, bodyStr) {
+function cartAction(url, method, bodyStr) {
   fetch(url, {
     method,
     headers: {
@@ -234,16 +250,67 @@ function drawerCartAction(url, method, bodyStr) {
     body: bodyStr || "",
   })
     .then((r) => r.json())
-    .then(renderDrawer);
+    .then(renderCart);
 }
 
-document.querySelectorAll("[data-cart-trigger]").forEach((btn) => {
-  btn.addEventListener("click", openDrawer);
-});
-document.querySelectorAll("[data-drawer-close]").forEach((btn) => {
-  btn.addEventListener("click", closeDrawer);
-});
-drawerOverlay?.addEventListener("click", closeDrawer);
+function initCart() {
+  if (cartState.initialized) return;
+  cartState.initialized = true;
+
+  cartState.drawer = document.querySelector("#cart-drawer");
+  cartState.overlay = document.querySelector("#cart-drawer-overlay");
+  cartState.body = document.querySelector("#cart-drawer-body");
+  cartState.footer = document.querySelector("#cart-drawer-footer");
+  if (!cartState.drawer || !cartState.overlay) return;
+
+  applyCartState();
+
+  document.querySelectorAll("[data-cart-trigger]").forEach((btn) => {
+    btn.addEventListener("click", toggleCart);
+  });
+
+  document.addEventListener("click", (e) => {
+    if (e.target.closest("[data-cart-close]")) closeCart();
+  });
+
+  cartState.overlay.addEventListener("click", closeCart);
+
+  cartState.body?.addEventListener("click", (e) => {
+    const qtyButton = e.target.closest("[data-drawer-qty]");
+    if (qtyButton) {
+      const slug = qtyButton.dataset.drawerQty;
+      const delta = Number(qtyButton.dataset.delta);
+      const item = cartState.items.find((i) => i.slug === slug);
+      if (!item) return;
+      const newQty = Math.max(0, Math.min(10, item.quantity + delta));
+      if (newQty === 0) {
+        cartAction(`/cart/remove/${slug}`, "POST");
+      } else {
+        cartAction(`/cart/update/${slug}`, "POST", `quantity=${newQty}`);
+      }
+      return;
+    }
+
+    const removeButton = e.target.closest("[data-drawer-remove]");
+    if (removeButton) {
+      cartAction(`/cart/remove/${removeButton.dataset.drawerRemove}`, "POST");
+    }
+  });
+
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && cartState.open) closeCart();
+  });
+
+  window.addEventListener("pagehide", closeCart);
+  window.addEventListener("popstate", closeCart);
+  window.addEventListener("hashchange", closeCart);
+}
+
+if (document.readyState === "complete") {
+  initCart();
+} else {
+  document.addEventListener("DOMContentLoaded", initCart, { once: true });
+}
 
 /* ── Quick Add (Feature 1) ── */
 document.querySelectorAll("[data-quick-add]").forEach((button) => {
@@ -264,8 +331,8 @@ document.querySelectorAll("[data-quick-add]").forEach((button) => {
       .then((data) => {
         updateCartCount(data.cart_count);
         showToast("Added to cart ✓");
-        openDrawer();
-        renderDrawer(data);
+        openCart();
+        renderCart(data);
       })
       .finally(() => {
         button.textContent = "Quick Add";
@@ -288,8 +355,8 @@ document.querySelectorAll('form[action*="/cart/add/"]').forEach((form) => {
       .then((data) => {
         updateCartCount(data.cart_count);
         showToast("Added to cart ✓");
-        openDrawer();
-        renderDrawer(data);
+        openCart();
+        renderCart(data);
       });
   });
 });
@@ -694,7 +761,7 @@ const mobileSearch = document.querySelector("#mobile-search-overlay");
 document.querySelector("[data-mobile-search-open]")?.addEventListener("click", () => {
   if (!mobileSearch) return;
   mobileSearch.hidden = false;
-  body.classList.add("overflow-hidden");
+  setBodyScrollLock("mobile-search", true);
   requestAnimationFrame(() => mobileSearch.classList.remove("opacity-0"));
   mobileSearch.querySelector("input")?.focus();
 });
@@ -703,10 +770,9 @@ document.querySelector("[data-mobile-search-close]")?.addEventListener("click", 
   mobileSearch.classList.add("opacity-0");
   setTimeout(() => {
     mobileSearch.hidden = true;
-    body.classList.remove("overflow-hidden");
+    setBodyScrollLock("mobile-search", false);
   }, 200);
 });
-document.querySelector("[data-mobile-cart-trigger]")?.addEventListener("click", openDrawer);
 
 /* ── Buy Now Pay Later tooltip (Feature 8) ── */
 document.querySelector("[data-bnpl-info]")?.addEventListener("click", () => {

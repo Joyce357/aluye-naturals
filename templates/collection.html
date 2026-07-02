@@ -76,4 +76,45 @@
     {% endif %}
   </div>
 </section>
+
+<div
+  id="cart-drawer-overlay"
+  data-shop-cart-overlay
+  hidden
+  class="fixed inset-0 z-[70] bg-black/50 opacity-0 transition-opacity duration-200"
+></div>
+<aside
+  id="cart-drawer"
+  data-shop-cart-panel
+  hidden
+  inert
+  role="dialog"
+  aria-modal="true"
+  aria-label="Your Ritual cart"
+  class="fixed inset-y-0 right-0 z-[80] flex w-full max-w-md flex-col border-l border-sand bg-cream shadow-2xl transition duration-200"
+  style="transform: translateX(100%);"
+>
+  <div class="flex min-h-16 items-center justify-between border-b border-sand bg-white px-5">
+    <div>
+      <p class="eyebrow text-clay">Shop bag</p>
+      <h2 class="font-display text-3xl font-semibold leading-none">Your Ritual</h2>
+    </div>
+    <button type="button" data-cart-close class="icon-button" aria-label="Close cart">{{ icon("close") }}</button>
+  </div>
+  <div id="cart-drawer-body" class="flex-1 overflow-y-auto px-5 py-4">
+    <p class="py-12 text-center text-bark">Your bag is empty.</p>
+  </div>
+  <div id="cart-drawer-footer" hidden class="border-t border-sand bg-white px-5 py-5">
+    <div id="cart-drawer-shipping" class="mb-4">
+      <p class="text-sm text-bark"><span id="drawer-shipping-text"></span></p>
+      <div class="mt-2 h-1.5 bg-sand"><div id="drawer-shipping-bar" class="h-full bg-botanical transition-all duration-300" style="width:0%"></div></div>
+    </div>
+    <div class="flex justify-between text-base font-semibold">
+      <span>Subtotal</span>
+      <span id="drawer-subtotal">$0</span>
+    </div>
+    <a href="{{ url_for('checkout') }}" data-cart-close class="btn-primary mt-4 w-full">Checkout</a>
+    <button type="button" data-cart-close class="mt-3 w-full text-center text-sm font-semibold underline">Continue shopping</button>
+  </div>
+</aside>
 {% endblock %}
