@@ -36,6 +36,20 @@
   </div>
 </section>
 
+<div class="mobile-social-bar">
+  <p>Follow our ritual</p>
+  <div class="mobile-social-icons">
+    <a href="{{ get_setting('instagram_url') }}" target="_blank" rel="noopener noreferrer" class="mobile-social-btn instagram">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="0.75" fill="currentColor" stroke="none"/></svg>
+      @aluye_naturals
+    </a>
+    <a href="{{ get_setting('tiktok_url') }}" target="_blank" rel="noopener noreferrer" class="mobile-social-btn tiktok">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 1 1-2.09-2.78V9.01a6.34 6.34 0 1 0 5.54 6.29V8.69a8.18 8.18 0 0 0 4.78 1.52V6.75c-.35 0-.69-.02-1.01-.06Z"/></svg>
+      @aluye_naturals
+    </a>
+  </div>
+</div>
+
 <section class="border-y border-neutral-200 bg-white">
   <div class="page-shell grid grid-cols-1 divide-y divide-neutral-200 sm:grid-cols-3 sm:divide-x sm:divide-y-0">
     {% for title, detail in [("Unrefined ingredients", "Kept close to their natural form"), ("West African roots", "Inspired by generations of beauty knowledge"), ("Made for every ritual", "Skin, hair, oils and men’s grooming")] %}

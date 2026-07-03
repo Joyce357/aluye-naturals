@@ -25,10 +25,27 @@
 @layer base {
   html {
     scroll-behavior: smooth;
+    max-width: 100%;
+    overflow-x: hidden;
   }
 
   body {
     @apply bg-bone font-sans text-ink antialiased;
+    max-width: 100%;
+    overflow-x: hidden;
+  }
+
+  *,
+  *::before,
+  *::after {
+    box-sizing: border-box;
+  }
+
+  img,
+  video,
+  iframe {
+    max-width: 100%;
+    height: auto;
   }
 
   button,
@@ -117,6 +134,183 @@
 
   .announcement-separator {
     padding-inline: 2rem;
+  }
+
+  .header-social-icons {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-right: 16px;
+  }
+
+  .header-social-icon {
+    display: flex;
+    align-items: center;
+    color: #17130f;
+    opacity: 0.65;
+    transition: opacity 0.2s ease;
+  }
+
+  .header-social-icon:hover {
+    opacity: 1;
+  }
+
+  .footer-social-links {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .footer-follow-label {
+    margin-bottom: 4px;
+    color: rgba(255, 255, 255, 0.5);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+  }
+
+  .social-link {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    color: rgba(255, 255, 255, 0.8);
+    text-decoration: none;
+    font-size: 14px;
+    transition: color 0.2s ease;
+  }
+
+  .social-link:hover {
+    color: #ffffff;
+  }
+
+  .social-link svg {
+    flex-shrink: 0;
+    opacity: 0.8;
+    transition: opacity 0.2s ease;
+  }
+
+  .social-link:hover svg {
+    opacity: 1;
+  }
+
+  .mobile-social-bar {
+    display: none;
+    padding: 16px 20px;
+    background: #fcfaf6;
+    border-top: 1px solid #e7d8c3;
+    border-bottom: 1px solid #e7d8c3;
+    text-align: center;
+  }
+
+  .mobile-social-bar p {
+    margin-bottom: 12px;
+    color: #594a3b;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+  }
+
+  .mobile-social-icons {
+    display: flex;
+    justify-content: center;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+
+  .mobile-social-btn {
+    display: flex;
+    min-height: 40px;
+    align-items: center;
+    gap: 6px;
+    border: 1px solid #17130f;
+    border-radius: 999px;
+    padding: 8px 14px;
+    color: #17130f;
+    text-decoration: none;
+    font-size: 13px;
+    transition: all 0.2s ease;
+  }
+
+  .mobile-social-btn:hover {
+    background: #17130f;
+    color: #ffffff;
+  }
+}
+
+@media (max-width: 767px) {
+  .header-social-icons {
+    display: none;
+  }
+
+  .mobile-social-bar {
+    display: block;
+  }
+
+  .page-shell {
+    padding-inline: 16px;
+  }
+
+  .hero-slider .font-display {
+    font-size: clamp(2rem, 11vw, 3.25rem);
+    line-height: 1.05;
+  }
+
+  [data-product-grid] {
+    grid-template-columns: 1fr !important;
+  }
+
+  .product-card {
+    min-width: 0;
+    width: 100%;
+  }
+
+  .product-card .grid-cols-2 {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .announcement-ticker-track {
+    animation-duration: 40s;
+  }
+
+  #mobile-menu {
+    z-index: 9999;
+  }
+
+  #cart-drawer {
+    max-width: min(100vw, 28rem);
+  }
+}
+
+@media (max-width: 480px) {
+  .section-heading {
+    font-size: 2rem;
+  }
+
+  .product-card .p-4 {
+    padding: 14px;
+  }
+
+  .product-card h3 {
+    font-size: 1rem;
+  }
+
+  .btn-primary,
+  .btn-secondary {
+    width: 100%;
+  }
+}
+
+@media (min-width: 481px) and (max-width: 767px) {
+  [data-product-grid] {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+}
+
+@media (min-width: 768px) and (max-width: 1024px) {
+  [data-product-grid] {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
   }
 }
 

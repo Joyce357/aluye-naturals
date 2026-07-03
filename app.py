@@ -1,6 +1,7 @@
 import gzip
 import os
 from pathlib import Path
+from datetime import datetime
 
 from dotenv import load_dotenv
 load_dotenv()
@@ -36,6 +37,21 @@ from admin import (
 
 BASE_DIR = Path(__file__).resolve().parent
 FREE_SHIPPING_THRESHOLD = 50
+DEFAULT_META_TITLE = "Aluyè Naturals | Premium Organic Skincare Rooted in West Africa"
+DEFAULT_META_DESCRIPTION = (
+    "Aluyè Naturals — Organic skincare rooted in West African heritage. Pure shea "
+    "butter, authentic African black soap, botanical oils and care. Body. Mind. Soul."
+)
+
+
+def has_broken_translation(value):
+    return isinstance(value, str) and "trans-" in value
+
+
+def clean_meta(value, fallback):
+    if not value or has_broken_translation(value):
+        return fallback
+    return " ".join(str(value).split())
 
 
 def create_app(test_config=None):
@@ -77,8 +93,32 @@ def create_app(test_config=None):
         shipping_remaining = max(0, FREE_SHIPPING_THRESHOLD - cart_subtotal)
         site_settings = load_setting("settings", {}) or {}
         homepage_settings = load_setting("homepage", {}) or {}
+        social_defaults = {
+            "instagram": "https://www.instagram.com/aluye_naturals",
+            "instagram_url": "https://www.instagram.com/aluye_naturals",
+            "tiktok": "https://www.tiktok.com/@aluye_naturals",
+            "tiktok_url": "https://www.tiktok.com/@aluye_naturals",
+        }
+        for key, value in social_defaults.items():
+            if not site_settings.get(key) or has_broken_translation(site_settings.get(key)):
+                site_settings[key] = value
+
+        def get_setting(key, default=""):
+            aliases = {
+                "instagram_url": "instagram",
+                "tiktok_url": "tiktok",
+                "facebook_url": "facebook",
+                "pinterest_url": "pinterest",
+            }
+            value = site_settings.get(key)
+            if not value and key in aliases:
+                value = site_settings.get(aliases[key])
+            if not value and key in social_defaults:
+                value = social_defaults[key]
+            return "" if has_broken_translation(value) else (value or default)
+
         return {
-            "site_name": site_settings.get("store_name") or "Aluyè Naturals",
+            "site_name": clean_meta(site_settings.get("store_name"), "Aluyè Naturals"),
             "site_url": app.config["SITE_URL"],
             "cart_count": sum(session.get("cart", {}).values()),
             "cart_subtotal": cart_subtotal,
@@ -90,6 +130,10 @@ def create_app(test_config=None):
             "breadcrumbs": build_breadcrumbs(),
             "site_settings": site_settings,
             "homepage_settings": homepage_settings,
+            "current_year": datetime.now().year,
+            "default_meta_title": DEFAULT_META_TITLE,
+            "default_meta_description": DEFAULT_META_DESCRIPTION,
+            "get_setting": get_setting,
         }
 
     @app.get("/")
@@ -136,10 +180,11 @@ def create_app(test_config=None):
             )
         )
         seo = {
-            "title": "Natural Shea Butter Skin, Hair & Body Care | Aluyè Naturals",
+            "title": DEFAULT_META_TITLE,
             "description": (
-                "Discover small-batch skin, hair, body and beard care made with "
-                "unrefined West African shea butter and thoughtfully sourced botanicals."
+                "Aluyè Naturals — Small-batch organic skincare, body butter, African "
+                "black soap and botanical oils rooted in West African heritage ingredients. "
+                "Free shipping over $50."
             ),
             "canonical_url": canonical_url,
             "image_url": hero_image_url,
@@ -300,9 +345,34 @@ def create_app(test_config=None):
                 for product in products
                 if tag.casefold() in {item.casefold() for item in product["tags"]}
             ]
+        category_meta = {
+            "Skin Care": (
+                "Natural Skin Care | Aluyè Naturals",
+                "Natural skin care made with unrefined shea butter and botanical ingredients. Whipped body butters, face oils and more from Aluyè Naturals.",
+            ),
+            "African Black Soap": (
+                "Natural African Black Soap | Aluyè Naturals",
+                "Authentic handcrafted African black soap made from plantain skins, cocoa pods and shea. Traditional cleanser for face and body. Shop Aluyè Naturals.",
+            ),
+            "Oil": (
+                "Natural Oil | Aluyè Naturals",
+                "Cold-pressed botanical face and body oils — rosehip, black seed, coconut and more. No additives, pure and natural. Aluyè Naturals.",
+            ),
+            "Men": (
+                "Natural Men | Aluyè Naturals",
+                "Natural men's grooming — beard wash, beard oil and beard balm made with African black soap and shea butter. Shop Aluyè Naturals men's range.",
+            ),
+        }
+        shop_title, shop_description = category_meta.get(
+            category,
+            (
+                "Shop Natural Skin, Hair & Body Care | Aluyè Naturals",
+                "Shop Aluyè Naturals — natural skin care, hair care, beard products and African black soap. Premium organic formulas made with pure West African botanical ingredients.",
+            ),
+        )
         seo = page_seo(
-            "Shop Natural Skin, Hair & Body Care | Aluyè Naturals",
-            "Shop natural body butter, cleansers, oils and grooming care made with unrefined shea and botanical ingredients.",
+            shop_title,
+            shop_description,
             "/shop",
         )
         return render_template(
@@ -328,7 +398,7 @@ def create_app(test_config=None):
             "about.html",
             seo=page_seo(
                 "Our Story | Aluyè Naturals",
-                "Discover the West African ingredients, beauty traditions and thoughtful sourcing behind Aluyè Naturals.",
+                "The story behind Aluyè Naturals — a natural beauty brand rooted in West African botanical heritage, unrefined ingredients and the belief that everyday care should be a ritual.",
                 "/about",
             ),
         )
@@ -361,8 +431,8 @@ def create_app(test_config=None):
             "contact.html",
             sent=sent,
             seo=page_seo(
-                "Contact Aluyè Naturals | Scarborough, Ontario",
-                "Contact Aluyè Naturals at 22-141 Galloway Road, Scarborough, Ontario M1E 4X4.",
+                "Contact | Aluyè Naturals",
+                "Contact Aluyè Naturals — questions about ingredients, products, orders or delivery. We reply within two business days. Get in touch today.",
                 "/contact",
             ),
         )
@@ -374,7 +444,7 @@ def create_app(test_config=None):
             posts=BLOG_POSTS,
             seo=page_seo(
                 "The Aluyè Journal | Natural Beauty Guides",
-                "Read practical ingredient guides, rituals and stories from Aluyè Naturals.",
+                "The Aluyè Journal — ingredient guides, ritual tips and stories behind our West African botanical skincare. Read, learn and discover your ritual.",
                 "/blog",
             ),
         )
@@ -401,7 +471,7 @@ def create_app(test_config=None):
         record_product_event(slug, "view")
         seo = page_seo(
             f"{product['name']} | Aluyè Naturals",
-            product["benefit"],
+            f"{product['name']} by Aluyè Naturals. {product.get('benefit') or product.get('description', '')} Natural ingredients, small-batch made. Free shipping on orders over $50.",
             f"/products/{slug}",
             product["image"],
         )
@@ -924,6 +994,8 @@ def create_app(test_config=None):
         return f"{app.config['SITE_URL']}/{path.lstrip('/')}"
 
     def page_seo(title, description, path, image=None, robots=None):
+        title = clean_meta(title, DEFAULT_META_TITLE)
+        description = clean_meta(description, DEFAULT_META_DESCRIPTION)
         image_url = (
             absolute_url(url_for("media", collection="products", filename=image))
             if image

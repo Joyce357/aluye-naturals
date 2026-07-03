@@ -3,9 +3,12 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>{% block title %}{{ seo.title if seo else "Aluyè Naturals | Body. Mind. Soul." }}{% endblock %}</title>
-  <meta name="description" content="{{ seo.description if seo else 'Natural skin, hair, body and beard care rooted in West African beauty rituals.' }}">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0">
+  {% set page_title %}{% block title %}{{ seo.title if seo else default_meta_title }}{% endblock %}{% endset %}
+  {% set page_description %}{% block meta_description %}{{ seo.description if seo and seo.description else default_meta_description }}{% endblock %}{% endset %}
+  {% set page_description_clean = page_description|striptags|trim %}
+  <title>{{ page_title|striptags|trim }}</title>
+  <meta name="description" content="{{ page_description_clean }}">
   <meta name="robots" content="{{ seo.robots if seo else 'index,follow' }}">
   <meta name="googlebot" content="{{ seo.robots if seo else 'index,follow' }}">
   <meta name="theme-color" content="#000000">
@@ -13,13 +16,13 @@
   <meta property="og:type" content="website">
   <meta property="og:site_name" content="{{ site_name }}">
   <meta property="og:title" content="{{ seo.title if seo else site_name }}">
-  <meta property="og:description" content="{{ seo.description if seo else '' }}">
+  <meta property="og:description" content="{{ page_description_clean }}">
   <meta property="og:url" content="{{ seo.canonical_url if seo else site_url }}">
   <meta property="og:image" content="{{ seo.image_url if seo else '' }}">
   <meta property="og:image:alt" content="{{ seo.image_alt if seo else '' }}">
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="{{ seo.title if seo else site_name }}">
-  <meta name="twitter:description" content="{{ seo.description if seo else '' }}">
+  <meta name="twitter:description" content="{{ page_description_clean }}">
   <meta name="twitter:image" content="{{ seo.image_url if seo else '' }}">
   <link rel="icon" type="image/png" href="{{ url_for('static', filename='images/favicon.png') }}">
   <link rel="manifest" href="/manifest.json">
@@ -29,7 +32,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}?v=4">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}?v=5">
   <style>
     @keyframes heartbeat{0%{transform:scale(1)}50%{transform:scale(1.3)}100%{transform:scale(1)}}
     [data-wishlist][aria-pressed="true"] svg{fill:#1a1a1a;stroke:#1a1a1a}
@@ -48,7 +51,7 @@
       .footer-accordion summary{display:none}
     }
   </style>
-  <script src="{{ url_for('static', filename='js/app.js') }}?v=8" defer></script>
+  <script src="{{ url_for('static', filename='js/app.js') }}?v=9" defer></script>
 </head>
 <body>
   <a href="#main-content" class="fixed left-4 top-4 z-[100] -translate-y-24 bg-white px-4 py-3 text-sm font-semibold text-black transition-transform focus:translate-y-0">Skip to content</a>
@@ -94,6 +97,14 @@
       </div>
 
       <div class="flex items-center justify-end">
+        <div class="header-social-icons">
+          <a href="{{ get_setting('instagram_url') }}" target="_blank" rel="noopener noreferrer" aria-label="Instagram" class="header-social-icon">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="0.75" fill="currentColor" stroke="none"/></svg>
+          </a>
+          <a href="{{ get_setting('tiktok_url') }}" target="_blank" rel="noopener noreferrer" aria-label="TikTok" class="header-social-icon">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 1 1-2.09-2.78V9.01a6.34 6.34 0 1 0 5.54 6.29V8.69a8.18 8.18 0 0 0 4.78 1.52V6.75c-.35 0-.69-.02-1.01-.06Z"/></svg>
+          </a>
+        </div>
         {% if request.endpoint == 'shop' %}
           <button type="button" data-cart-trigger class="icon-button relative" aria-label="Shopping bag with {{ cart_count }} items">
             {{ icon("bag") }}
@@ -232,12 +243,40 @@
       </details>
       <details class="footer-accordion">
         <summary>Follow</summary>
-        <div class="footer-links"><h3 class="hidden text-xs font-bold uppercase tracking-wider md:block">Follow</h3><ul class="mt-3 flex gap-4 text-sm text-white/70 md:mt-5 md:flex-col md:gap-0 md:space-y-3"><li><a href="https://instagram.com/aluye_naturals" target="_blank" rel="noopener" class="inline-flex size-11 items-center justify-center hover:text-white md:size-auto md:inline">Instagram</a></li><li><a href="https://tiktok.com/@aluye_naturals" target="_blank" rel="noopener" class="inline-flex size-11 items-center justify-center hover:text-white md:size-auto md:inline">TikTok</a></li><li><a href="https://facebook.com/aluyenaturals" target="_blank" rel="noopener" class="inline-flex size-11 items-center justify-center hover:text-white md:size-auto md:inline">Facebook</a></li><li><a href="https://pinterest.com/aluyenaturals" target="_blank" rel="noopener" class="inline-flex size-11 items-center justify-center hover:text-white md:size-auto md:inline">Pinterest</a></li></ul></div>
+        <div class="footer-links">
+          <div class="footer-social-links md:mt-5">
+            <p class="footer-follow-label hidden md:block">Follow</p>
+            {% if get_setting('instagram_url') %}
+            <a href="{{ get_setting('instagram_url') }}" target="_blank" rel="noopener noreferrer" aria-label="Follow Aluyè Naturals on Instagram" class="social-link">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><rect x="2" y="2" width="20" height="20" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="0.75" fill="currentColor" stroke="none"/></svg>
+              <span>Instagram</span>
+            </a>
+            {% endif %}
+            {% if get_setting('tiktok_url') %}
+            <a href="{{ get_setting('tiktok_url') }}" target="_blank" rel="noopener noreferrer" aria-label="Follow Aluyè Naturals on TikTok" class="social-link">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 1 1-2.09-2.78V9.01a6.34 6.34 0 1 0 5.54 6.29V8.69a8.18 8.18 0 0 0 4.78 1.52V6.75c-.35 0-.69-.02-1.01-.06Z"/></svg>
+              <span>TikTok</span>
+            </a>
+            {% endif %}
+            {% if get_setting('facebook_url') %}
+            <a href="{{ get_setting('facebook_url') }}" target="_blank" rel="noopener noreferrer" aria-label="Follow Aluyè Naturals on Facebook" class="social-link">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3V2Z"/></svg>
+              <span>Facebook</span>
+            </a>
+            {% endif %}
+            {% if get_setting('pinterest_url') %}
+            <a href="{{ get_setting('pinterest_url') }}" target="_blank" rel="noopener noreferrer" aria-label="Follow Aluyè Naturals on Pinterest" class="social-link">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 0C5.4 0 0 5.4 0 12c0 5.1 3.2 9.4 7.6 11.2-.1-.9-.2-2.4 0-3.4.2-.9 1.4-6 1.4-6s-.4-.7-.4-1.8c0-1.7 1-2.9 2.2-2.9 1 0 1.5.8 1.5 1.7 0 1-.7 2.6-1 4-.3 1.2.6 2.2 1.8 2.2 2.1 0 3.8-2.2 3.8-5.5 0-2.9-2.1-4.9-5-4.9-3.4 0-5.4 2.6-5.4 5.2 0 1 .4 2.1.9 2.7.1.1.1.2.1.3l-.3 1.4c-.1.2-.2.3-.4.2-1.5-.7-2.4-2.9-2.4-4.6 0-3.8 2.8-7.3 7.9-7.3 4.2 0 7.4 3 7.4 6.9 0 4.1-2.6 7.5-6.2 7.5-1.2 0-2.4-.6-2.8-1.4l-.7 2.9c-.3 1-1 2.4-1.5 3.1 1.1.3 2.3.5 3.5.5 6.6 0 12-5.4 12-12S18.6 0 12 0Z"/></svg>
+              <span>Pinterest</span>
+            </a>
+            {% endif %}
+          </div>
+        </div>
       </details>
     </div>
     <div class="border-t border-white/20">
       <div class="page-shell flex flex-col gap-4 py-6 text-xs text-white/55 sm:flex-row sm:items-center sm:justify-between">
-        <p>© 2026 Aluyè Naturals. Body. Mind. Soul.</p>
+        <p>© {{ current_year }} Aluyè Naturals. Body. Mind. Soul.</p>
         <div class="flex flex-wrap items-center gap-5">
           <a href="{{ url_for('privacy_policy') }}">Privacy</a><a href="{{ url_for('terms') }}">Terms</a><a href="{{ url_for('privacy_policy') }}#cookies">Cookies</a>
           <label for="currency-selector" class="sr-only">Currency and region</label>
