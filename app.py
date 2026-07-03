@@ -96,8 +96,8 @@ def create_app(test_config=None):
         social_defaults = {
             "instagram": "https://www.instagram.com/aluye_naturals",
             "instagram_url": "https://www.instagram.com/aluye_naturals",
-            "tiktok": "https://www.tiktok.com/@aluye_naturals",
-            "tiktok_url": "https://www.tiktok.com/@aluye_naturals",
+            "tiktok": "https://www.tiktok.com/@aluye_naturals?_r=1&_t=ZS-97jHiLTSc6u",
+            "tiktok_url": "https://www.tiktok.com/@aluye_naturals?_r=1&_t=ZS-97jHiLTSc6u",
         }
         for key, value in social_defaults.items():
             if not site_settings.get(key) or has_broken_translation(site_settings.get(key)):
