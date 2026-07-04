@@ -28,6 +28,7 @@
   <link rel="manifest" href="/manifest.json">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  {% if site_settings.get('google_search_console') %}<meta name="google-site-verification" content="{{ site_settings.google_search_console }}">{% endif %}
   {% for schema in structured_data|default([]) %}<script type="application/ld+json">{{ schema|tojson }}</script>{% endfor %}
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -51,6 +52,26 @@
     }
   </style>
   <script src="{{ url_for('static', filename='js/app.js') }}?v=9" defer></script>
+  {% if site_settings.get('google_analytics_id') %}
+  <script async src="https://www.googletagmanager.com/gtag/js?id={{ site_settings.google_analytics_id }}"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+    gtag('config', '{{ site_settings.google_analytics_id }}');
+  </script>
+  {% endif %}
+  {% if site_settings.get('facebook_pixel_id') %}
+  <script>
+    !function(f,b,e,v,n,t,s){if(f.fbq)return;n=f.fbq=function(){n.callMethod?
+    n.callMethod.apply(n,arguments):n.queue.push(arguments)};if(!f._fbq)f._fbq=n;
+    n.push=n;n.loaded=!0;n.version='2.0';n.queue=[];t=b.createElement(e);t.async=!0;
+    t.src=v;s=b.getElementsByTagName(e)[0];s.parentNode.insertBefore(t,s)}(window,
+    document,'script','https://connect.facebook.net/en_US/fbevents.js');
+    fbq('init', '{{ site_settings.facebook_pixel_id }}');
+    fbq('track', 'PageView');
+  </script>
+  {% endif %}
 </head>
 <body>
   <a href="#main-content" class="fixed left-4 top-4 z-[100] -translate-y-24 bg-white px-4 py-3 text-sm font-semibold text-black transition-transform focus:translate-y-0">Skip to content</a>
@@ -275,7 +296,7 @@
     </div>
     <div class="border-t border-white/20">
       <div class="page-shell flex flex-col gap-4 py-6 text-xs text-white/55 sm:flex-row sm:items-center sm:justify-between">
-        <p>© {{ current_year }} Aluyè Naturals. Body. Mind. Soul.</p>
+        <p>© {{ current_year }} Aluyè Naturals. Body. Mind. Soul. · Designed by JoyceTech</p>
         <div class="flex flex-wrap items-center gap-5">
           <a href="{{ url_for('privacy_policy') }}">Privacy</a><a href="{{ url_for('terms') }}">Terms</a><a href="{{ url_for('privacy_policy') }}#cookies">Cookies</a>
           <label for="currency-selector" class="sr-only">Currency and region</label>

@@ -47,13 +47,23 @@ DEFAULT_META_DESCRIPTION = (
 
 
 def has_broken_translation(value):
-    return isinstance(value, str) and "trans-" in value
+    if not isinstance(value, str):
+        return False
+    lowered = value.lower()
+    return "trans-" in value or "welcome to wordpress" in lowered or "this is your first post" in lowered
 
 
 def clean_meta(value, fallback):
     if not value or has_broken_translation(value):
         return fallback
     return " ".join(str(value).split())
+
+
+def get_meta_override(key, fallback):
+    """Admin-configured SEO override (Global Settings -> SEO), falling back to the
+    on-brand default if unset or corrupted."""
+    settings = load_setting("settings", {}) or {}
+    return clean_meta(settings.get(key), fallback)
 
 
 def create_app(test_config=None):
@@ -136,8 +146,10 @@ def create_app(test_config=None):
             "site_settings": site_settings,
             "homepage_settings": homepage_settings,
             "current_year": datetime.now().year,
-            "default_meta_title": DEFAULT_META_TITLE,
-            "default_meta_description": DEFAULT_META_DESCRIPTION,
+            "default_meta_title": get_meta_override("meta_title", DEFAULT_META_TITLE),
+            "default_meta_description": get_meta_override(
+                "meta_description", DEFAULT_META_DESCRIPTION
+            ),
             "get_setting": get_setting,
         }
 
@@ -185,11 +197,12 @@ def create_app(test_config=None):
             )
         )
         seo = {
-            "title": DEFAULT_META_TITLE,
-            "description": (
+            "title": get_meta_override("meta_title", DEFAULT_META_TITLE),
+            "description": get_meta_override(
+                "meta_description",
                 "Aluyè Naturals — Small-batch organic skincare, body butter, African "
                 "black soap and botanical oils rooted in West African heritage ingredients. "
-                "Delivered across Canada."
+                "Delivered across Canada.",
             ),
             "canonical_url": canonical_url,
             "image_url": hero_image_url,
