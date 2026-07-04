@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+
+{% block content %}
+<section class="page-shell py-20 text-center">
+  <div class="mx-auto max-w-md">
+    <p class="eyebrow text-neutral-500">Email preferences</p>
+    <h1 class="mt-3 font-display text-5xl font-semibold">You're unsubscribed</h1>
+    {% if email %}
+    <p class="mt-6 text-neutral-600">{{ email }} has been removed from our mailing list. You will no longer receive marketing emails from us.</p>
+    {% else %}
+    <p class="mt-6 text-neutral-600">No email address was provided, so nothing was changed.</p>
+    {% endif %}
+    <a href="{{ url_for('home') }}" class="btn-primary mt-8 inline-flex">Return home</a>
+  </div>
+</section>
+{% endblock %}

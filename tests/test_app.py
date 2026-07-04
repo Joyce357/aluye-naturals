@@ -141,7 +141,7 @@ def test_premium_commerce_features_render_and_shipping_threshold():
     cart = client.get("/cart").get_data(as_text=True)
     assert 'Shopping bag with 1 items' in cart
     assert 'data-price="32"' in cart
-    assert "Add " in cart and "more for free shipping" in cart
+    assert "calculated at checkout" in cart
 
     loyalty = client.get("/loyalty")
     assert loyalty.status_code == 200

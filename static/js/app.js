@@ -15,26 +15,32 @@ function setBodyScrollLock(key, locked) {
   body.classList.toggle("overflow-hidden", bodyScrollLocks.size > 0);
 }
 
+/* Prices in the catalog are CAD face-value (this is a Canadian store).
+   CAD is rate 1 (no conversion); other currencies convert FROM CAD for display only —
+   the amount actually charged (PayPal, order totals) is always CAD. */
 const currencyOptions = {
-  USD: { rate: 1, locale: "en-US" },
-  CAD: { rate: 1.36, locale: "en-CA" },
-  GBP: { rate: 0.79, locale: "en-GB" },
-  NGN: { rate: 1600, locale: "en-NG" },
+  CAD: { rate: 1, locale: "en-CA" },
+  USD: { rate: 0.74, locale: "en-US" },
+  GBP: { rate: 0.58, locale: "en-GB" },
+  NGN: { rate: 1176, locale: "en-NG" },
 };
 
 function getCurrency() {
-  return localStorage.getItem("aluye-currency") || "USD";
+  return localStorage.getItem("aluye-currency") || "CAD";
 }
 
 function formatMoney(amount, code) {
   code = code || getCurrency();
-  const opt = currencyOptions[code] || currencyOptions.USD;
-  return new Intl.NumberFormat(opt.locale, {
+  const opt = currencyOptions[code] || currencyOptions.CAD;
+  const formatted = new Intl.NumberFormat(opt.locale, {
     style: "currency",
     currency: code,
     minimumFractionDigits: code === "NGN" ? 0 : 0,
     maximumFractionDigits: code === "NGN" ? 0 : 2,
   }).format(amount * opt.rate);
+  /* Explicitly label the currency code (e.g. "$20 CAD") since some locales
+     render CAD with a bare "$" that's indistinguishable from USD. */
+  return `${formatted} ${code}`;
 }
 
 function updateCurrency(root = document) {
@@ -205,7 +211,7 @@ function renderCart(data) {
     .map(
       (item) => `
     <article class="flex gap-4 border-b border-sand py-4">
-      <img src="/media/products/${item.image}" alt="" width="64" height="80" class="h-20 w-16 bg-white object-contain p-1">
+      <img src="/media/products/${item.image}" alt="" width="64" height="80" loading="lazy" class="h-20 w-16 bg-white object-contain p-1">
       <div class="min-w-0 flex-1">
         <p class="text-sm font-semibold leading-snug">${item.name}</p>
         <p class="mt-1 text-xs text-bark">${item.size}</p>
@@ -227,16 +233,8 @@ function renderCart(data) {
     cartState.footer.hidden = false;
     const subtotalEl = document.querySelector("#drawer-subtotal");
     const shippingText = document.querySelector("#drawer-shipping-text");
-    const shippingBar = document.querySelector("#drawer-shipping-bar");
     if (subtotalEl) subtotalEl.textContent = formatMoney(data.subtotal, code);
-    if (data.shipping_remaining > 0) {
-      shippingText.textContent = `Add ${formatMoney(data.shipping_remaining, code)} more for free shipping`;
-      const pct = Math.min(100, Math.round((data.subtotal / 50) * 100));
-      shippingBar.style.width = pct + "%";
-    } else {
-      shippingText.textContent = "You've unlocked free delivery!";
-      shippingBar.style.width = "100%";
-    }
+    if (shippingText) shippingText.textContent = "Shipping calculated at checkout";
   }
 }
 
@@ -665,23 +663,56 @@ if (exitPopup && !sessionStorage.getItem("aluye-exit-shown") && !localStorage.ge
     exitPopup.classList.add("opacity-0");
     setTimeout(() => (exitPopup.hidden = true), 300);
   });
-  exitPopup.querySelector("#exit-form")?.addEventListener("submit", (e) => {
+  exitPopup.querySelector("#exit-form")?.addEventListener("submit", async (e) => {
     e.preventDefault();
-    const email = exitPopup.querySelector("#exit-email")?.value;
-    if (!email) return;
-    fetch("/api/subscribe", {
-      method: "POST",
-      headers: { "Content-Type": "application/x-www-form-urlencoded", "X-Requested-With": "XMLHttpRequest" },
-      body: `email=${encodeURIComponent(email)}`,
-    }).then(() => {
-      localStorage.setItem("aluye-subscribed", "1");
-      exitPopup.querySelector("#exit-form").innerHTML =
-        '<p class="py-4 text-center font-semibold text-success">Your 10% code is on its way ✓</p>';
-      setTimeout(() => {
-        exitPopup.classList.add("opacity-0");
-        setTimeout(() => (exitPopup.hidden = true), 300);
-      }, 2500);
-    });
+    const form = exitPopup.querySelector("#exit-form");
+    const emailInput = exitPopup.querySelector("#exit-email");
+    const errorEl = exitPopup.querySelector("#exit-email-error");
+    const btn = exitPopup.querySelector("#exit-submit-btn");
+    const email = emailInput.value.trim();
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+    if (!emailRegex.test(email)) {
+      errorEl.textContent = "Please enter a valid email address.";
+      errorEl.classList.remove("hidden");
+      return;
+    }
+    errorEl.classList.add("hidden");
+    btn.disabled = true;
+    btn.textContent = "Sending...";
+
+    try {
+      const response = await fetch("/api/subscribe", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: email, source: "exit_popup" }),
+      });
+      const data = await response.json();
+
+      if (data.ok) {
+        localStorage.setItem("aluye-subscribed", "1");
+        form.innerHTML =
+          '<div class="py-2 text-center">' +
+          '<p class="font-semibold text-success">✓ Your discount code is on its way!</p>' +
+          '<div class="mt-4 border-2 border-dashed border-clay bg-cream py-3 text-xl font-bold tracking-widest">RITUAL10</div>' +
+          '<p class="mt-3 text-sm text-bark">Use this at checkout for 10% off your first order.</p>' +
+          "</div>";
+        setTimeout(() => {
+          exitPopup.classList.add("opacity-0");
+          setTimeout(() => (exitPopup.hidden = true), 300);
+        }, 4000);
+      } else {
+        btn.disabled = false;
+        btn.textContent = "Claim My 10% Off";
+        errorEl.textContent = "Something went wrong. Please try again.";
+        errorEl.classList.remove("hidden");
+      }
+    } catch (error) {
+      btn.disabled = false;
+      btn.textContent = "Claim My 10% Off";
+      errorEl.textContent = "Connection error. Please try again.";
+      errorEl.classList.remove("hidden");
+    }
   });
 }
 
@@ -713,7 +744,7 @@ if (searchInput && searchDropdown) {
               .map(
                 (r) => `
               <a href="/products/${r.slug}" class="flex items-center gap-3 px-4 py-3 hover:bg-cream">
-                <img src="/media/products/${r.image}" alt="" class="size-10 object-contain">
+                <img src="/media/products/${r.image}" alt="" loading="lazy" class="size-10 object-contain">
                 <div class="min-w-0 flex-1">
                   <p class="text-sm font-semibold">${r.name}</p>
                   <p class="text-xs text-bark">${r.category}</p>
@@ -735,24 +766,6 @@ if (searchInput && searchDropdown) {
     if (searchInput.value.trim().length >= 2 && searchDropdown.innerHTML) {
       searchDropdown.hidden = false;
     }
-  });
-}
-
-/* ── WhatsApp Chat Bubble (Feature 26) ── */
-const waBubble = document.querySelector("#wa-chat-bubble");
-if (waBubble) {
-  setTimeout(() => {
-    waBubble.hidden = false;
-    requestAnimationFrame(() => waBubble.classList.remove("opacity-0"));
-    setTimeout(() => {
-      waBubble.classList.add("opacity-0");
-      setTimeout(() => (waBubble.hidden = true), 300);
-    }, 6000);
-  }, 5000);
-  waBubble.querySelector("[data-wa-dismiss]")?.addEventListener("click", (e) => {
-    e.stopPropagation();
-    waBubble.classList.add("opacity-0");
-    setTimeout(() => (waBubble.hidden = true), 300);
   });
 }
 

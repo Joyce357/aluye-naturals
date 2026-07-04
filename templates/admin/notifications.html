@@ -1,4 +1,23 @@
 {% extends "admin/base.html" %}{% block title %}Notifications | Aluyè Admin{% endblock %}{% block content %}
-<div class="flex items-end justify-between"><div><p class="text-xs uppercase tracking-wider text-clay">Activity centre</p><h1 class="mt-2 font-display text-5xl font-semibold">Notifications</h1></div><form method="post" action="{{ url_for('admin.notifications_read') }}"><button class="btn-secondary">Mark all as read</button></form></div>
-<div class="mt-8 divide-y divide-sand border border-sand bg-white">{% for item in notifications %}<article class="flex gap-4 p-5 {% if not item.is_read %}bg-cream{% endif %}"><span class="mt-1 size-3 rounded-full {% if item.kind=='order' %}bg-success{% elif item.kind=='message' %}bg-clay{% else %}bg-error{% endif %}"></span><div><div class="flex items-center gap-3"><h2 class="font-semibold">{{ item.title }}</h2>{% if not item.is_read %}<span class="text-xs font-bold uppercase text-clay">New</span>{% endif %}</div><p class="mt-1 text-sm text-bark">{{ item.detail }}</p><time class="mt-2 block text-xs text-neutral-500">{{ item.created_at }}</time></div></article>{% else %}<p class="p-10 text-center text-bark">No notifications yet.</p>{% endfor %}</div>
+<div class="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between"><div><p class="text-xs uppercase tracking-wider text-clay">Activity centre</p><h1 class="mt-2 font-display text-5xl font-semibold">Notifications</h1></div><form method="post" action="{{ url_for('admin.notifications_read') }}"><button class="btn-secondary">Mark all as read</button></form></div>
+<div class="mt-8 divide-y divide-sand border border-sand bg-white">
+  {% for item in notifications %}
+  <article class="flex min-w-0 flex-col items-start gap-3 p-5 sm:flex-row {% if not item.is_read %}bg-cream{% endif %}">
+    <a href="{{ url_for('admin.notification_detail', notification_id=item.id) }}" class="flex min-w-0 flex-1 gap-4">
+      <span class="mt-1 size-3 shrink-0 rounded-full {% if item.kind=='order' %}bg-success{% elif item.kind=='message' %}bg-clay{% else %}bg-error{% endif %}"></span>
+      <div class="min-w-0 flex-1">
+        <div class="flex flex-wrap items-center gap-3"><h2 class="font-semibold hover:underline">{{ item.title }}</h2>{% if not item.is_read %}<span class="text-xs font-bold uppercase text-clay">New</span>{% endif %}</div>
+        <p class="mt-1 break-words text-sm text-bark">{{ item.detail }}</p>
+        <time class="mt-2 block text-xs text-neutral-500">{{ item.created_at }}</time>
+      </div>
+    </a>
+    <div class="flex shrink-0 gap-3">
+      <form method="post" action="{{ url_for('admin.notification_archive', notification_id=item.id) }}"><button class="text-xs font-semibold underline">Archive</button></form>
+      <form method="post" action="{{ url_for('admin.notification_delete', notification_id=item.id) }}" data-confirm="Delete this notification?"><button class="text-xs font-semibold text-error underline">Delete</button></form>
+    </div>
+  </article>
+  {% else %}
+  <p class="p-10 text-center text-bark">No notifications yet.</p>
+  {% endfor %}
+</div>
 {% endblock %}

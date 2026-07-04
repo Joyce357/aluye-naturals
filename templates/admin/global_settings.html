@@ -45,6 +45,13 @@
       <label class="text-sm font-semibold">Maintenance message</label>
       <textarea name="maintenance_message" rows="2" class="mt-1 w-full border border-sand bg-cream p-4">{{ s.get('maintenance_message', '') }}</textarea>
     </div>
+    {% if s.get('store_status') == 'maintenance' %}
+    <div class="border border-clay bg-cream p-4 text-sm">
+      <p class="font-bold">Maintenance mode is active.</p>
+      <p class="mt-1">To preview the live site, visit: <code class="font-semibold">{{ site_url }}/?preview=aluye2026</code></p>
+      <p class="mt-1 text-bark">Share this link with the team only.</p>
+    </div>
+    {% endif %}
     <button class="btn-primary">Save General Settings</button>
   </form>
 
@@ -63,7 +70,7 @@
   {# Tab 3: Contact #}
   <form method="post" data-settings-panel="contact" hidden class="space-y-5">
     <input type="hidden" name="tab" value="contact">
-    {% for field, label in [("business_name", "Business name"), ("address", "Full address"), ("contact_email", "Contact email"), ("phone", "Phone number"), ("whatsapp", "WhatsApp number"), ("response_time", "Response time message"), ("google_maps_url", "Google Maps embed URL")] %}
+    {% for field, label in [("business_name", "Business name"), ("address", "Full address"), ("contact_email", "Contact email"), ("phone", "Phone number"), ("response_time", "Response time message"), ("google_maps_url", "Google Maps embed URL")] %}
     <div>
       <label class="text-sm font-semibold">{{ label }}</label>
       {% if field == 'address' %}
@@ -125,7 +132,7 @@
   {# Tab 6: Store #}
   <form method="post" data-settings-panel="store" hidden class="space-y-5">
     <input type="hidden" name="tab" value="store">
-    {% for field, label in [("free_shipping_threshold", "Free shipping threshold ($)"), ("tax_rate", "Tax rate (%)"), ("returns_window", "Returns window (days)"), ("gift_wrap_price", "Gift wrapping price ($)"), ("low_stock_threshold", "Low stock warning threshold")] %}
+    {% for field, label in [("tax_rate", "Tax rate (%)"), ("returns_window", "Returns window (days)"), ("gift_wrap_price", "Gift wrapping price ($)"), ("low_stock_threshold", "Low stock warning threshold")] %}
     <div>
       <label class="text-sm font-semibold">{{ label }}</label>
       <input name="{{ field }}" value="{{ s.get(field, '') }}" class="mt-1 min-h-12 w-full border border-sand bg-cream px-4">
@@ -201,12 +208,21 @@
     {% for provider, fields in [("Stripe", [("stripe_publishable", "Publishable key"), ("stripe_secret", "Secret key")]), ("PayPal", [("paypal_client", "Client ID"), ("paypal_secret", "Secret")]), ("Flutterwave", [("flutterwave_public", "Public key"), ("flutterwave_secret", "Secret key")]), ("Paystack", [("paystack_public", "Public key"), ("paystack_secret", "Secret key")])] %}
     <div class="border border-sand bg-white p-4">
       <p class="font-semibold">{{ provider }} {% if s.get(provider|lower ~ '_configured') %}<span class="text-xs text-success">✓ Connected</span>{% else %}<span class="text-xs text-bark">Not configured</span>{% endif %}</p>
+      {% if provider == "PayPal" and not s.get('paypal_configured') %}
+      <p class="mt-2 border border-error bg-white px-3 py-2 text-xs font-semibold text-error">PayPal is not configured. Add a Client ID and Secret below to enable PayPal at checkout.</p>
+      {% endif %}
       {% for field, label in fields %}
       <div class="mt-3">
         <label class="text-xs font-semibold text-bark">{{ label }}</label>
         <input name="{{ field }}" value="{{ s.get(field, '') }}" type="{{ 'password' if 'secret' in field else 'text' }}" class="mt-1 min-h-10 w-full border border-sand bg-cream px-3 text-sm">
       </div>
       {% endfor %}
+      {% if provider == "PayPal" %}
+      <label class="mt-3 flex items-center gap-2 text-xs font-semibold text-bark">
+        <input type="checkbox" name="paypal_sandbox" {% if s.get('paypal_sandbox', True) %}checked{% endif %} class="size-4 accent-ink">
+        Use PayPal Sandbox (test mode) — uncheck when ready to accept real payments
+      </label>
+      {% endif %}
     </div>
     {% endfor %}
 
@@ -234,8 +250,13 @@
     tabs.forEach(t=>{t.classList.toggle("border-ink",t.dataset.settingsTab===key);t.classList.toggle("text-ink",t.dataset.settingsTab===key);t.classList.toggle("border-transparent",t.dataset.settingsTab!==key);t.classList.toggle("text-bark",t.dataset.settingsTab!==key)});
     panels.forEach(p=>p.hidden=p.dataset.settingsPanel!==key);
   }
-  tabs.forEach(t=>t.addEventListener("click",()=>show(t.dataset.settingsTab)));
-  mobile?.addEventListener("change",()=>show(mobile.value));
+  tabs.forEach(t=>t.addEventListener("click",()=>{show(t.dataset.settingsTab);history.replaceState(null,"","?tab="+t.dataset.settingsTab)}));
+  mobile?.addEventListener("change",()=>{show(mobile.value);history.replaceState(null,"","?tab="+mobile.value)});
+  const requested = new URLSearchParams(window.location.search).get("tab");
+  if (requested && document.querySelector('[data-settings-panel="'+requested+'"]')) {
+    show(requested);
+    if (mobile) mobile.value = requested;
+  }
 })();
 </script>
 {% endblock %}

@@ -39,7 +39,6 @@
     [data-wishlist].heart-animate svg{animation:heartbeat 0.3s ease}
     @media(max-width:767px){
       body{padding-bottom:4.5rem}
-      #wa-container{bottom:5.5rem!important}
       .footer-accordion summary{list-style:none;cursor:pointer;display:flex;align-items:center;justify-content:space-between;min-height:48px;font-size:0.75rem;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;border-bottom:1px solid rgba(255,255,255,0.15)}
       .footer-accordion summary::after{content:"+";font-size:1.25rem}
       .footer-accordion[open] summary::after{content:"−"}
@@ -59,7 +58,7 @@
   <div class="announcement-ticker h-9 overflow-hidden bg-black text-white" aria-label="Store announcements">
     <div class="announcement-ticker-track">
       <div class="announcement-ticker-group">
-        <span>{{ homepage_settings.get('announcement_1', 'Free shipping on orders over $50') }}</span>
+        <span>{{ homepage_settings.get('announcement_1', 'Delivering across Canada') }}</span>
         <span class="announcement-separator" aria-hidden="true">•</span>
         <span>{{ homepage_settings.get('announcement_2', 'Small-batch care, rooted in nature') }}</span>
         <span class="announcement-separator" aria-hidden="true">•</span>
@@ -67,7 +66,7 @@
         <span class="announcement-separator" aria-hidden="true">•</span>
       </div>
       <div class="announcement-ticker-group" aria-hidden="true">
-        <span>{{ homepage_settings.get('announcement_1', 'Free shipping on orders over $50') }}</span>
+        <span>{{ homepage_settings.get('announcement_1', 'Delivering across Canada') }}</span>
         <span class="announcement-separator">•</span>
         <span>{{ homepage_settings.get('announcement_2', 'Small-batch care, rooted in nature') }}</span>
         <span class="announcement-separator">•</span>
@@ -225,8 +224,8 @@
       <div>
         <h2 class="font-display text-3xl font-semibold">{{ site_name }}</h2>
         <p class="mt-4 text-sm leading-6 text-white/65">Natural skin, hair, body and beard care rooted in West African ingredients and everyday ritual.</p>
-        <address class="mt-5 text-sm not-italic leading-6 text-white/80">{{ site_settings.get('address', '22-141 Galloway Road\nScarborough, Ontario\nM1E 4X4')|replace('\n', '<br>')|safe }}</address>
-        {% if site_settings.get('contact_email') %}<a class="mt-3 block text-sm text-white/80 underline" href="mailto:{{ site_settings.contact_email }}">{{ site_settings.contact_email }}</a>{% endif %}
+        <address class="mt-5 text-sm not-italic leading-6 text-white/80">{{ site_settings.get('address', 'Toronto, Ontario, Canada')|replace('\n', '<br>')|safe }}</address>
+        {% if site_settings.get('contact_email') %}<a class="mt-3 inline-flex size-9 items-center justify-center border border-white/30 text-white/80 hover:text-white" href="mailto:{{ site_settings.contact_email }}" aria-label="Email {{ site_name }}">{{ icon("mail", "size-4") }}</a>{% endif %}
         {% if site_settings.get('phone') %}<a class="mt-2 block text-sm text-white/80 underline" href="tel:{{ site_settings.phone }}">{{ site_settings.phone }}</a>{% endif %}
       </div>
       <details class="footer-accordion">
@@ -281,8 +280,8 @@
           <a href="{{ url_for('privacy_policy') }}">Privacy</a><a href="{{ url_for('terms') }}">Terms</a><a href="{{ url_for('privacy_policy') }}#cookies">Cookies</a>
           <label for="currency-selector" class="sr-only">Currency and region</label>
           <select id="currency-selector" data-currency-selector class="min-h-11 border border-white/30 bg-black px-3 text-xs text-white">
-            <option value="USD">United States / USD</option>
             <option value="CAD">Canada / CAD</option>
+            <option value="USD">United States / USD</option>
             <option value="GBP">United Kingdom / GBP</option>
             <option value="NGN">Nigeria / NGN</option>
           </select>
@@ -300,26 +299,14 @@
       <span class="font-display text-2xl font-semibold">{{ site_name }}</span>
       <h2 class="mt-5 font-display text-4xl font-semibold">Before you go...</h2>
       <p class="mt-3 text-bark">Get 10% off your first ritual</p>
-      <form id="exit-form" class="mt-6">
-        <input id="exit-email" type="email" required placeholder="Your email address" class="min-h-12 w-full border border-sand bg-cream px-4 text-center">
-        <button class="btn-primary mt-3 w-full">Claim My 10% Off</button>
+      <form id="exit-form" novalidate class="mt-6">
+        <input id="exit-email" name="email" type="email" required autocomplete="email" placeholder="Your email address" class="min-h-12 w-full border border-sand bg-cream px-4 text-center">
+        <p id="exit-email-error" class="mt-2 hidden text-sm text-error">Please enter a valid email address.</p>
+        <button type="submit" id="exit-submit-btn" class="btn-primary mt-3 w-full">Claim My 10% Off</button>
       </form>
       <button type="button" data-exit-close class="mt-4 text-sm text-bark underline">No thanks</button>
     </div>
   </div>
-
-  {# Feature 26: WhatsApp Chat Button #}
-  {% if not request.path.startswith('/admin') %}
-  <div class="fixed bottom-8 right-8 z-50 md:bottom-8 md:right-8" style="bottom: 5.5rem;" id="wa-container">
-    <div id="wa-chat-bubble" hidden class="absolute -top-14 right-0 whitespace-nowrap rounded bg-white px-4 py-2 text-sm font-semibold shadow-lg opacity-0 transition-opacity duration-300">
-      💬 Questions? Chat with us
-      <button data-wa-dismiss class="ml-2 text-bark">×</button>
-    </div>
-    <a href="https://wa.me/{{ site_settings.get('whatsapp', '') }}?text=Hi%20Aluy%C3%A8%20Naturals%2C%20I%27d%20like%20to%20know%20more%20about%20your%20products" target="_blank" rel="noopener" aria-label="Chat on WhatsApp" class="flex size-14 items-center justify-center rounded-full shadow-lg" style="background-color: #25D366;">
-      <svg class="size-7 text-white" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M12 2C6.477 2 2 6.477 2 12c0 1.89.525 3.66 1.438 5.168L2 22l4.832-1.438A9.955 9.955 0 0 0 12 22c5.523 0 10-4.477 10-10S17.523 2 12 2zm0 18a7.96 7.96 0 0 1-4.29-1.248l-.308-.184-2.87.852.852-2.87-.184-.308A7.96 7.96 0 0 1 4 12c0-4.411 3.589-8 8-8s8 3.589 8 8-3.589 8-8 8z"/></svg>
-    </a>
-  </div>
-  {% endif %}
 
   {# Feature 27: Mobile Bottom Nav #}
   <nav class="fixed inset-x-0 bottom-0 z-50 flex items-center justify-around border-t border-neutral-200 bg-white py-2 md:hidden" aria-label="Mobile navigation" id="mobile-bottom-nav">

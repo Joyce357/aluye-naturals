@@ -1,0 +1,42 @@
+{% extends "admin/base.html" %}
+{% block title %}Site Issues — Aluyè Admin{% endblock %}
+{% block content %}
+<div class="space-y-6 p-6 md:p-10">
+  <div>
+    <p class="eyebrow text-bark">Engineering</p>
+    <h1 class="mt-2 font-display text-4xl font-semibold">Site Issues</h1>
+    <p class="mt-2 text-sm text-bark">Tracked from <code>SITE_ISSUES.md</code> at the project root. Update that file and this list together.</p>
+  </div>
+
+  {% set status_styles = {
+    "open": ("bg-error text-white", "Open"),
+    "fixed_local": ("bg-clay text-white", "Fixed locally"),
+    "resolved": ("bg-success text-white", "Resolved"),
+    "not_reproducible": ("bg-sand text-ink", "Not reproducible"),
+    "skipped": ("bg-neutral-200 text-ink", "Skipped"),
+  } %}
+  {% set priority_order = ["Critical", "High", "Medium", "Low"] %}
+
+  {% for priority in priority_order %}
+    {% set items = issues|selectattr("priority", "equalto", priority)|list %}
+    {% if items %}
+    <div>
+      <h2 class="text-xs font-bold uppercase tracking-wider text-bark">{{ priority }}</h2>
+      <div class="mt-3 overflow-x-auto border border-sand">
+        <table class="admin-table-responsive w-full min-w-[560px] text-sm">
+          <thead class="border-b-2 border-sand bg-cream text-left text-xs font-bold uppercase tracking-wider"><tr><th class="py-3 pl-4 pr-4">Issue</th><th class="py-3 pr-4">Status</th></tr></thead>
+          <tbody class="divide-y divide-sand bg-white">
+            {% for issue in items %}
+            <tr>
+              <td data-label="Issue" class="py-3 pl-4 pr-4">{{ issue.title }}</td>
+              <td data-label="Status" class="py-3 pr-4"><span class="px-2 py-1 text-xs font-bold uppercase {{ status_styles.get(issue.status, ('bg-sand text-ink', issue.status))[0] }}">{{ status_styles.get(issue.status, ('bg-sand text-ink', issue.status))[1] }}</span></td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+    {% endif %}
+  {% endfor %}
+</div>
+{% endblock %}

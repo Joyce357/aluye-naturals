@@ -2,15 +2,23 @@
 {% block title %}Subscribers — Aluyè Admin{% endblock %}
 {% block content %}
 <div class="space-y-6 p-6 md:p-10">
-  <div><p class="eyebrow text-bark">Email marketing</p><h1 class="mt-2 font-display text-4xl font-semibold">Subscribers</h1><p class="mt-2 text-sm text-bark">{{ subscribers|length }} email subscriber{{ 's' if subscribers|length != 1 }}.</p></div>
+  <div class="flex flex-wrap items-end justify-between gap-4">
+    <div><p class="eyebrow text-bark">Email marketing</p><h1 class="mt-2 font-display text-4xl font-semibold">Subscribers</h1><p class="mt-2 text-sm text-bark">{{ subscribers|length }} email subscriber{{ 's' if subscribers|length != 1 }}.</p></div>
+    {% if subscribers %}<a href="{{ url_for('admin.subscribers_export') }}" class="btn-secondary">Export to CSV</a>{% endif %}
+  </div>
 
   {% if subscribers %}
   <div class="overflow-x-auto">
-    <table class="w-full text-sm">
-      <thead class="border-b-2 border-sand text-left text-xs font-bold uppercase tracking-wider"><tr><th class="py-3 pr-4">Email</th><th class="py-3">Subscribed</th></tr></thead>
+    <table class="admin-table-responsive w-full text-sm">
+      <thead class="border-b-2 border-sand text-left text-xs font-bold uppercase tracking-wider"><tr><th class="py-3 pr-4">Email</th><th class="py-3 pr-4">Source</th><th class="py-3 pr-4">Subscribed</th><th class="py-3">Status</th></tr></thead>
       <tbody class="divide-y divide-sand">
         {% for sub in subscribers %}
-        <tr><td class="py-3 pr-4 font-semibold">{{ sub.email }}</td><td class="py-3 text-bark">{{ sub.created_at[:10] }}</td></tr>
+        <tr>
+          <td data-label="Email" class="py-3 pr-4 font-semibold">{{ sub.email }}</td>
+          <td data-label="Source" class="py-3 pr-4 text-bark">{{ sub.source or 'website' }}</td>
+          <td data-label="Subscribed" class="py-3 pr-4 text-bark">{{ sub.created_at[:10] }}</td>
+          <td data-label="Status" class="py-3"><span class="bg-success px-2 py-1 text-xs font-bold uppercase text-white">Active</span></td>
+        </tr>
         {% endfor %}
       </tbody>
     </table>

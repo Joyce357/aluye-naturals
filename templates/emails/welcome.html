@@ -1,23 +1,82 @@
 <!doctype html>
 <html>
 <head><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>Welcome to Aluyè Naturals</title></head>
-<body style="margin:0;padding:0;background:#f9f6f1;font-family:Arial,sans-serif;color:#17130f;">
+<body style="margin:0;padding:0;background:#f9f6f1;font-family:Arial,Helvetica,sans-serif;color:#17130f;">
   <div style="max-width:600px;margin:0 auto;">
-    <div style="background:#1a1a1a;padding:24px;text-align:center;">
-      <h1 style="margin:0;color:#fff;font-family:Georgia,serif;font-size:28px;">Aluyè Naturals</h1>
+
+    <!-- Header -->
+    <div style="background:#1a1a1a;padding:28px 24px;text-align:center;">
+      <h1 style="margin:0;color:#fff;font-family:Georgia,'Times New Roman',serif;font-size:28px;">Aluyè Naturals</h1>
       <p style="margin:8px 0 0;color:#d4a85f;font-size:10px;letter-spacing:0.2em;text-transform:uppercase;">Body · Mind · Soul</p>
     </div>
-    <div style="background:#fff;padding:40px 32px;text-align:center;">
-      <h2 style="font-family:Georgia,serif;font-size:24px;margin:0 0 16px;">Welcome to the ritual{{ ', ' + name if name else '' }} 🌿</h2>
-      <p style="color:#594a3b;line-height:1.7;margin:0 0 24px;">Thank you for joining the Aluyè community. Here's your exclusive 15% off code for your first order:</p>
-      <div style="background:#f9f6f1;border:2px dashed #d4a85f;padding:16px;margin:0 auto 24px;max-width:200px;">
-        <p style="font-size:24px;font-weight:bold;letter-spacing:0.1em;margin:0;">RITUAL15</p>
+
+    <!-- Body -->
+    <div style="background:#f9f6f1;padding:40px 32px;">
+      <h2 style="font-family:Georgia,'Times New Roman',serif;font-size:26px;margin:0 0 20px;text-align:center;">Welcome to the ritual, {{ first_name or 'there' }}.</h2>
+
+      <p style="color:#594a3b;line-height:1.7;margin:0 0 16px;font-size:15px;">Thank you for joining the Aluyè Naturals community. You are now part of a growing family that believes everyday care should be intentional, natural and deeply rooted in heritage.</p>
+      <p style="color:#594a3b;line-height:1.7;margin:0 0 28px;font-size:15px;">We create small-batch skincare, hair care and body care using unrefined West African botanical ingredients — kept as close to nature as possible, because that is where the real power is.</p>
+
+      <!-- Discount box -->
+      <div style="border:1px solid #e7d8c3;background:#fff;padding:24px;text-align:center;margin:0 0 28px;">
+        <p style="margin:0 0 14px;font-size:14px;color:#594a3b;">As a thank you for joining us, here is your exclusive welcome gift:</p>
+        <div style="display:inline-block;border:2px dashed #d4a85f;padding:14px 28px;margin:0 0 14px;">
+          <p style="font-size:24px;font-weight:bold;letter-spacing:0.15em;margin:0;">{{ discount_code or 'RITUAL15' }}</p>
+        </div>
+        <p style="margin:0;font-size:13px;color:#594a3b;">Use this code at checkout to get {{ discount_percent or 15 }}% off your first order. Valid for 30 days.</p>
       </div>
-      <a href="{{ site_url }}" style="display:inline-block;background:#17130f;color:#fff;padding:14px 32px;text-decoration:none;font-weight:bold;font-size:14px;">Start Your Ritual</a>
+
+      <div style="text-align:center;margin:0 0 36px;">
+        <a href="{{ site_url }}/shop" style="display:inline-block;background:#17130f;color:#fff;padding:14px 32px;text-decoration:none;font-weight:bold;font-size:13px;letter-spacing:0.05em;text-transform:uppercase;">Start Your Ritual &rarr;</a>
+      </div>
+
+      {% if featured_products %}
+      <h3 style="font-family:Georgia,'Times New Roman',serif;font-size:19px;margin:0 0 18px;text-align:center;">Start with our bestsellers</h3>
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 32px;">
+        <tr>
+          {% for product in featured_products %}
+          <td style="width:33.33%;padding:0 8px;text-align:center;vertical-align:top;">
+            <a href="{{ site_url }}/product/{{ product.slug }}" style="text-decoration:none;color:#17130f;">
+              <img src="{{ site_url }}/media/products/{{ product.image }}" alt="{{ product.name }}" width="140" style="width:100%;max-width:140px;height:auto;background:#fff;border:1px solid #e7d8c3;">
+              <p style="font-size:12px;font-weight:bold;margin:10px 0 4px;line-height:1.4;">{{ product.name }}</p>
+              <p style="font-size:12px;color:#594a3b;margin:0;">${{ product.price }}</p>
+            </a>
+          </td>
+          {% endfor %}
+        </tr>
+      </table>
+      {% endif %}
+
+      <div style="border-top:1px solid #e7d8c3;padding-top:24px;margin:0 0 8px;">
+        <p style="font-size:13px;font-weight:bold;margin:0 0 12px;">As an Aluyè Naturals subscriber you will receive:</p>
+        <p style="font-size:14px;color:#594a3b;line-height:2;margin:0 0 24px;">
+          ✦ Early access to new product launches<br>
+          ✦ Ingredient guides and ritual tips<br>
+          ✦ Members-only offers and discounts<br>
+          ✦ Stories from our West African heritage ingredient journey
+        </p>
+      </div>
+
+      <p style="color:#594a3b;line-height:1.7;margin:0;font-size:15px;">Thank you for choosing natural, intentional care.</p>
+      <p style="color:#594a3b;line-height:1.7;margin:16px 0 0;font-size:15px;">With warmth,<br>The Aluyè Naturals Team</p>
     </div>
-    <div style="background:#1a1a1a;padding:24px;text-align:center;color:#ffffff99;font-size:12px;">
-      <p style="margin:0;">© 2026 Aluyè Naturals. Body. Mind. Soul.</p>
-      <p style="margin:8px 0 0;"><a href="{{ site_url }}" style="color:#d4a85f;text-decoration:underline;">Visit our store</a></p>
+
+    <!-- Footer -->
+    <div style="background:#1a1a1a;padding:28px 24px;text-align:center;color:#ffffff99;font-size:12px;">
+      <p style="margin:0 0 12px;">
+        <a href="https://www.instagram.com/aluye_naturals" style="color:#d4a85f;text-decoration:none;margin:0 8px;">Instagram</a>|
+        <a href="https://www.tiktok.com/@aluye_naturals" style="color:#d4a85f;text-decoration:none;margin:0 8px;">TikTok</a>|
+        <a href="#" style="color:#d4a85f;text-decoration:none;margin:0 8px;">Facebook</a>|
+        <a href="#" style="color:#d4a85f;text-decoration:none;margin:0 8px;">Pinterest</a>
+      </p>
+      <p style="margin:0 0 12px;">Follow our ritual @aluye_naturals</p>
+      <p style="margin:0 0 12px;">Toronto, Ontario, Canada</p>
+      <p style="margin:0 0 12px;">
+        <a href="{{ site_url }}/privacy-policy" style="color:#d4a85f;text-decoration:underline;">Privacy Policy</a> ·
+        <a href="{{ site_url }}/unsubscribe?email={{ email }}" style="color:#d4a85f;text-decoration:underline;">Unsubscribe</a> ·
+        <a href="{{ site_url }}/terms-of-service" style="color:#d4a85f;text-decoration:underline;">Terms of Service</a>
+      </p>
+      <p style="margin:0;color:#ffffff66;">You are receiving this email because you subscribed at aluyenaturals.com. To unsubscribe click the link above.</p>
     </div>
   </div>
 </body>

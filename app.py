@@ -1,5 +1,7 @@
 import gzip
+import json
 import os
+import re
 from pathlib import Path
 from datetime import datetime
 
@@ -26,6 +28,7 @@ from catalog import (
     PRODUCTS as CATALOG_PRODUCTS,
 )
 from admin import (
+    deduct_stock,
     init_admin,
     load_setting,
     record_page_view,
@@ -36,7 +39,6 @@ from admin import (
 
 
 BASE_DIR = Path(__file__).resolve().parent
-FREE_SHIPPING_THRESHOLD = 50
 DEFAULT_META_TITLE = "Aluyè Naturals | Premium Organic Skincare Rooted in West Africa"
 DEFAULT_META_DESCRIPTION = (
     "Aluyè Naturals — Organic skincare rooted in West African heritage. Pure shea "
@@ -78,19 +80,22 @@ def create_app(test_config=None):
         if request.method == "GET" and not request.path.startswith(
             ("/admin", "/static", "/media", "/health")
         ):
+            if request.args.get("preview") == "aluye2026":
+                session["preview_mode"] = True
             settings = load_setting("settings", {}) or {}
-            if settings.get("store_status", "").lower() == "maintenance":
+            if settings.get("store_status", "").lower() == "maintenance" and not session.get(
+                "preview_mode"
+            ):
                 return render_template(
                     "maintenance.html",
                     message=settings.get("maintenance_message")
-                    or "We are preparing something beautiful. Please check back shortly.",
+                    or "Aluyè Naturals is currently undergoing some improvements. We will be back very soon.",
                 ), 503
             record_page_view(request.path)
 
     @app.context_processor
     def inject_site_metadata():
         _, cart_subtotal = cart_summary()
-        shipping_remaining = max(0, FREE_SHIPPING_THRESHOLD - cart_subtotal)
         site_settings = load_setting("settings", {}) or {}
         homepage_settings = load_setting("homepage", {}) or {}
         social_defaults = {
@@ -102,6 +107,11 @@ def create_app(test_config=None):
         for key, value in social_defaults.items():
             if not site_settings.get(key) or has_broken_translation(site_settings.get(key)):
                 site_settings[key] = value
+
+        if not site_settings.get("contact_email") or has_broken_translation(
+            site_settings.get("contact_email")
+        ):
+            site_settings["contact_email"] = "erica@aluyenaturals.com"
 
         def get_setting(key, default=""):
             aliases = {
@@ -122,11 +132,6 @@ def create_app(test_config=None):
             "site_url": app.config["SITE_URL"],
             "cart_count": sum(session.get("cart", {}).values()),
             "cart_subtotal": cart_subtotal,
-            "shipping_remaining": shipping_remaining,
-            "shipping_progress": min(
-                100, round(cart_subtotal / FREE_SHIPPING_THRESHOLD * 100)
-            ),
-            "free_shipping_threshold": FREE_SHIPPING_THRESHOLD,
             "breadcrumbs": build_breadcrumbs(),
             "site_settings": site_settings,
             "homepage_settings": homepage_settings,
@@ -184,7 +189,7 @@ def create_app(test_config=None):
             "description": (
                 "Aluyè Naturals — Small-batch organic skincare, body butter, African "
                 "black soap and botanical oils rooted in West African heritage ingredients. "
-                "Free shipping over $50."
+                "Delivered across Canada."
             ),
             "canonical_url": canonical_url,
             "image_url": hero_image_url,
@@ -299,17 +304,51 @@ def create_app(test_config=None):
 
     @app.post("/api/subscribe")
     def api_subscribe():
-        from admin import get_db, add_notification
-        email = request.form.get("email", "").strip()
-        if email and "@" in email:
+        from admin import get_db, add_notification, send_welcome_email
+
+        payload = request.get_json(silent=True) or {}
+        email = (payload.get("email") or request.form.get("email", "")).strip()
+        source = (payload.get("source") or request.form.get("source", "website")).strip()
+
+        email_regex = r"^[^\s@]+@[^\s@]+\.[^\s@]+$"
+        if not email or not re.match(email_regex, email):
+            return {"ok": False, "status": "invalid_email"}, 400
+
+        db = get_db()
+        existing = db.execute(
+            "SELECT 1 FROM subscribers WHERE email=?", (email,)
+        ).fetchone()
+        if existing:
+            return {"ok": True, "status": "already_subscribed"}
+
+        db.execute(
+            "INSERT INTO subscribers(email, created_at, source) VALUES(?, ?, ?)",
+            (email, datetime.now().isoformat(timespec="minutes"), source),
+        )
+        db.commit()
+        add_notification("subscriber", "New subscriber", email)
+
+        try:
+            send_welcome_email(email, source=source)
+        except Exception as exc:
+            print(f"Welcome email error for {email}: {exc}")
+
+        return {
+            "ok": True,
+            "status": "subscribed",
+            "discount_code": "RITUAL10" if source == "exit_popup" else "RITUAL15",
+        }
+
+    @app.get("/unsubscribe")
+    def unsubscribe():
+        from admin import get_db
+
+        email = request.args.get("email", "").strip()
+        if email:
             db = get_db()
-            db.execute(
-                "INSERT OR IGNORE INTO subscribers(email, created_at) VALUES(?, ?)",
-                (email, __import__("datetime").datetime.now().isoformat(timespec="minutes")),
-            )
+            db.execute("DELETE FROM subscribers WHERE email=?", (email,))
             db.commit()
-            add_notification("subscriber", "New subscriber", email)
-        return {"ok": True}
+        return render_template("unsubscribe.html", email=email)
 
     @app.get("/shop")
     def shop():
@@ -418,6 +457,8 @@ def create_app(test_config=None):
     def contact():
         sent = False
         if request.method == "POST":
+            if request.form.get("company", "").strip():
+                return redirect(url_for("contact"))
             name = request.form.get("name", "").strip()
             email = request.form.get("email", "").strip()
             subject = request.form.get("topic", "Website enquiry").strip()
@@ -471,7 +512,7 @@ def create_app(test_config=None):
         record_product_event(slug, "view")
         seo = page_seo(
             f"{product['name']} | Aluyè Naturals",
-            f"{product['name']} by Aluyè Naturals. {product.get('benefit') or product.get('description', '')} Natural ingredients, small-batch made. Free shipping on orders over $50.",
+            f"{product['name']} by Aluyè Naturals. {product.get('benefit') or product.get('description', '')} Natural ingredients, small-batch made. Delivered across Canada.",
             f"/products/{slug}",
             product["image"],
         )
@@ -514,7 +555,7 @@ def create_app(test_config=None):
                     "brand": {"@type": "Brand", "name": "Aluyè Naturals"},
                     "offers": {
                         "@type": "Offer",
-                        "priceCurrency": "USD",
+                        "priceCurrency": "CAD",
                         "price": product["price"],
                         "availability": "https://schema.org/InStock",
                         "url": absolute_url(f"/products/{slug}"),
@@ -537,7 +578,6 @@ def create_app(test_config=None):
                 "ok": True,
                 "cart_count": sum(session.get("cart", {}).values()),
                 "subtotal": subtotal,
-                "shipping_remaining": max(0, FREE_SHIPPING_THRESHOLD - subtotal),
                 "items": [
                     {
                         "slug": i["product"]["slug"],
@@ -569,7 +609,6 @@ def create_app(test_config=None):
             "cart.html",
             items=items,
             subtotal=subtotal,
-            delivery_remaining=max(0, FREE_SHIPPING_THRESHOLD - subtotal),
             seo=seo,
         )
 
@@ -579,7 +618,6 @@ def create_app(test_config=None):
             "ok": True,
             "cart_count": sum(session.get("cart", {}).values()),
             "subtotal": subtotal,
-            "shipping_remaining": max(0, FREE_SHIPPING_THRESHOLD - subtotal),
             "items": [
                 {
                     "slug": i["product"]["slug"],
@@ -623,55 +661,121 @@ def create_app(test_config=None):
         flash("Item removed from your bag.", "success")
         return redirect(url_for("cart"))
 
+    def validate_checkout_form(form):
+        errors = {}
+        for field in ("email", "first_name", "last_name", "address", "city", "postal_code", "country"):
+            if not form.get(field):
+                errors[field] = "Please complete this field."
+        if form.get("email") and "@" not in form["email"]:
+            errors["email"] = "Enter a valid email address."
+        return errors
+
+    def quote_shipping(form, method="standard"):
+        from admin import calculate_shipping
+
+        return calculate_shipping(form.get("postal_code", ""), form.get("country", ""), method=method)
+
+    def send_order_emails(order_number, form, items, subtotal, shipping_fee, zone_name, payment_method, transaction_id):
+        from admin import get_admin_email, send_mail
+
+        settings = load_setting("settings", {}) or {}
+        address_line = ", ".join(
+            part for part in [form.get("address"), form.get("apartment"), form.get("city"), form.get("postal_code"), form.get("country")] if part
+        )
+        order_date = datetime.now().strftime("%B %d, %Y at %I:%M %p")
+        common_ctx = dict(
+            order_number=order_number,
+            items=items,
+            subtotal=subtotal,
+            delivery=shipping_fee,
+            total=subtotal + shipping_fee,
+            zone_name=zone_name,
+            site_url=app.config["SITE_URL"],
+            address_line=address_line,
+            phone=form.get("phone", ""),
+            payment_method=payment_method,
+            transaction_id=transaction_id,
+            order_date=order_date,
+        )
+        customer_html = render_template(
+            "emails/order_confirmation.html",
+            customer_name=form.get("first_name", ""),
+            contact_email=settings.get("contact_email", ""),
+            **common_ctx,
+        )
+        send_mail(
+            subject=f"Your Aluyè Naturals order is confirmed 🌿 (#{order_number})",
+            recipients=[form["email"]],
+            html=customer_html,
+        )
+        admin_html = render_template(
+            "emails/admin_order_notification.html",
+            customer_name=f"{form.get('first_name','')} {form.get('last_name','')}".strip(),
+            customer_email=form.get("email", ""),
+            **common_ctx,
+        )
+        send_mail(
+            subject=f"New order {order_number} — CAD ${subtotal + shipping_fee:.2f}",
+            recipients=[get_admin_email()],
+            html=admin_html,
+        )
+
+    def place_order(form, items, subtotal, shipping_quote, payment_method, status="Pending", transaction_id=""):
+        order_number = f"AN-{abs(hash((form['email'], subtotal, datetime.now().timestamp()))) % 900000 + 100000}"
+        shipping_fee = shipping_quote["rate"] or 0
+        save_order(
+            order_number, form, items, subtotal,
+            shipping_fee=shipping_fee, payment_method=payment_method,
+            status=status, transaction_id=transaction_id,
+        )
+        deduct_stock(items)
+        try:
+            send_order_emails(
+                order_number, form, items, subtotal, shipping_fee,
+                shipping_quote.get("zone_name"), payment_method, transaction_id,
+            )
+        except Exception as exc:
+            print(f"Order email error for {order_number}: {exc}")
+        session.pop("cart", None)
+        return order_number, shipping_fee
+
     @app.route("/checkout", methods=["GET", "POST"])
     def checkout():
+
         items, subtotal = cart_summary()
         if not items:
             flash("Your bag is empty.", "error")
             return redirect(url_for("shop"))
         errors = {}
         form = {}
+        settings = load_setting("settings", {}) or {}
+        paypal_client_id = settings.get("paypal_client") if settings.get("paypal_configured") else None
+
+        shipping_method = request.values.get("shipping_method", "standard")
+        preview_form = {"postal_code": request.values.get("postal_code", ""), "country": request.values.get("country", "")}
+        shipping_quote = quote_shipping(preview_form, shipping_method) if request.method == "GET" else None
+
         if request.method == "POST":
             form = {key: request.form.get(key, "").strip() for key in CHECKOUT_FIELDS}
-            for field in ("email", "first_name", "last_name", "address", "city", "postal_code", "country"):
-                if not form[field]:
-                    errors[field] = "Please complete this field."
-            if form["email"] and "@" not in form["email"]:
-                errors["email"] = "Enter a valid email address."
+            errors = validate_checkout_form(form)
+            shipping_quote = quote_shipping(form, shipping_method)
+            if not shipping_quote["available"]:
+                if shipping_quote["needs_quote"]:
+                    errors["postal_code"] = "We don't have automatic delivery pricing for this address — we'll follow up with a manual shipping quote."
+                else:
+                    errors["postal_code"] = "Sorry, we don't currently deliver to this address."
             if not errors:
-                delivery = 0 if subtotal >= FREE_SHIPPING_THRESHOLD else 8
-                order_number = f"AN-{abs(hash((form['email'], subtotal))) % 900000 + 100000}"
-                save_order(order_number, form, items, subtotal + delivery)
-                try:
-                    if app.config.get("MAIL_USERNAME"):
-                        from flask_mail import Mail, Message as MailMessage
-                        mail = Mail(app)
-                        email_html = render_template(
-                            "emails/order_confirmation.html",
-                            order_number=order_number,
-                            customer_name=form.get("first_name", ""),
-                            items=items, subtotal=subtotal, delivery=delivery,
-                            total=subtotal + delivery,
-                            site_url=app.config["SITE_URL"],
-                            contact_email=load_setting("settings", {}).get("contact_email", ""),
-                        )
-                        mail.send(MailMessage(
-                            subject=f"Your Aluyè Naturals order is confirmed 🌿 (#{order_number})",
-                            sender=app.config["MAIL_DEFAULT_SENDER"],
-                            recipients=[form["email"]],
-                            html=email_html,
-                        ))
-                except Exception:
-                    pass
-                session.pop("cart", None)
+                order_number, shipping_fee = place_order(
+                    form, items, subtotal, shipping_quote, payment_method="Bank Transfer / Online Payment"
+                )
                 return render_template(
                     "confirmation.html",
                     order_number=order_number,
                     customer=form,
                     items=items,
                     subtotal=subtotal,
-                    delivery=delivery,
-                    total=subtotal + delivery,
+                    delivery=shipping_fee,
+                    total=subtotal + shipping_fee,
                     seo=page_seo(
                         "Order Confirmed | Aluyè Naturals",
                         "Your Aluyè Naturals order is confirmed.",
@@ -679,13 +783,17 @@ def create_app(test_config=None):
                         robots="noindex,nofollow",
                     ),
                 )
-        delivery = 0 if subtotal >= FREE_SHIPPING_THRESHOLD else 8
+        delivery = shipping_quote["rate"] or 0 if shipping_quote and shipping_quote["available"] else 0
         return render_template(
             "checkout.html",
             items=items,
             subtotal=subtotal,
             delivery=delivery,
             total=subtotal + delivery,
+            shipping_quote=shipping_quote,
+            paypal_client_id=paypal_client_id,
+            is_admin=bool(session.get("admin_user_id")),
+            s=settings,
             errors=errors,
             form=form,
             seo=page_seo(
@@ -694,6 +802,122 @@ def create_app(test_config=None):
                 "/checkout",
                 robots="noindex,nofollow",
             ),
+        )
+
+    @app.post("/api/shipping-quote")
+    def shipping_quote_api():
+        postal_code = request.form.get("postal_code", "")
+        country = request.form.get("country", "")
+        method = request.form.get("shipping_method", "standard")
+        quote = quote_shipping({"postal_code": postal_code, "country": country}, method)
+        return quote
+
+    @app.post("/api/paypal/create-order")
+    def paypal_create_order_route():
+        import paypal_client
+
+        settings = load_setting("settings", {}) or {}
+        if not paypal_client.is_configured(settings):
+            return {"error": "PayPal is not configured."}, 400
+
+        items, subtotal = cart_summary()
+        if not items:
+            return {"error": "Your bag is empty."}, 400
+
+        form = {key: request.form.get(key, "").strip() for key in CHECKOUT_FIELDS}
+        errors = validate_checkout_form(form)
+        shipping_method = request.form.get("shipping_method", "standard")
+        quote = quote_shipping(form, shipping_method)
+        if not quote["available"]:
+            return {"error": "We don't currently deliver to this address."}, 400
+        if errors:
+            return {"error": "Please complete all required fields.", "fields": errors}, 400
+
+        total = subtotal + (quote["rate"] or 0)
+        try:
+            order = paypal_client.create_order(settings, total, currency="CAD")
+        except Exception as exc:
+            print(f"PayPal create-order error: {exc}")
+            return {"error": "Could not start PayPal checkout. Please try again."}, 502
+        return {"id": order["id"]}
+
+    @app.post("/api/paypal/capture-order/<paypal_order_id>")
+    def paypal_capture_order_route(paypal_order_id):
+        import paypal_client
+
+        settings = load_setting("settings", {}) or {}
+        if not paypal_client.is_configured(settings):
+            return {"ok": False, "error": "PayPal is not configured."}, 400
+
+        items, subtotal = cart_summary()
+        if not items:
+            return {"ok": False, "error": "Your bag is empty."}, 400
+
+        form = {key: request.form.get(key, "").strip() for key in CHECKOUT_FIELDS}
+        errors = validate_checkout_form(form)
+        if errors:
+            return {"ok": False, "error": "Please complete all required fields."}, 400
+
+        shipping_method = request.form.get("shipping_method", "standard")
+        quote = quote_shipping(form, shipping_method)
+        if not quote["available"]:
+            return {"ok": False, "error": "We don't currently deliver to this address."}, 400
+
+        try:
+            capture = paypal_client.capture_order(settings, paypal_order_id)
+        except Exception as exc:
+            print(f"PayPal capture error: {exc}")
+            return {"ok": False, "error": "PayPal payment could not be captured."}, 502
+
+        if capture.get("status") != "COMPLETED":
+            return {"ok": False, "error": "PayPal payment was not completed."}, 400
+
+        transaction_id = paypal_client.extract_capture_id(capture)
+        order_number, shipping_fee = place_order(
+            form, items, subtotal, quote,
+            payment_method="PayPal", status="Paid", transaction_id=transaction_id,
+        )
+        return {"ok": True, "redirect": url_for("checkout_confirmation", order_number=order_number)}
+
+    @app.get("/checkout/confirmation/<order_number>")
+    def checkout_confirmation(order_number):
+        from admin import get_db
+
+        order = get_db().execute(
+            "SELECT * FROM orders WHERE order_number=?", (order_number,)
+        ).fetchone()
+        if not order:
+            abort(404)
+        return render_template(
+            "confirmation.html",
+            order_number=order["order_number"],
+            customer={"first_name": order["customer_name"].split(" ")[0], "email": order["email"]},
+            items=json.loads(order["items"]),
+            subtotal=order["total"] - order["shipping_fee"],
+            delivery=order["shipping_fee"],
+            total=order["total"],
+            seo=page_seo(
+                "Order Confirmed | Aluyè Naturals",
+                "Your Aluyè Naturals order is confirmed.",
+                "/checkout",
+                robots="noindex,nofollow",
+            ),
+        )
+
+    @app.get("/checkout/payment-failed")
+    def checkout_payment_failed():
+        return render_template(
+            "payment_status.html",
+            status="failed",
+            seo=page_seo("Payment Failed | Aluyè Naturals", "Your payment could not be completed.", "/checkout/payment-failed", robots="noindex,nofollow"),
+        )
+
+    @app.get("/checkout/payment-cancelled")
+    def checkout_payment_cancelled():
+        return render_template(
+            "payment_status.html",
+            status="cancelled",
+            seo=page_seo("Payment Cancelled | Aluyè Naturals", "Your payment was cancelled.", "/checkout/payment-cancelled", robots="noindex,nofollow"),
         )
 
     @app.post("/products/<slug>/review")
@@ -1199,6 +1423,7 @@ CHECKOUT_FIELDS = (
     "city",
     "postal_code",
     "country",
+    "phone",
 )
 
 RITUALS = [

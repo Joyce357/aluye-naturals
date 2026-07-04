@@ -32,7 +32,7 @@
   if (!items.length) { table.hidden = true; empty.hidden = false; return; }
 
   const rows = [
-    ["", ...items.map(p => `<div class="text-center"><a href="/products/${p.slug}"><img src="/media/products/${p.image}" alt="${p.name}" class="mx-auto h-40 object-contain"></a></div>`)],
+    ["", ...items.map(p => `<div class="text-center"><a href="/products/${p.slug}"><img src="/media/products/${p.image}" alt="${p.name}" loading="lazy" class="mx-auto h-40 object-contain"></a></div>`)],
     ["Name", ...items.map(p => `<strong>${p.name}</strong>`)],
     ["Category", ...items.map(p => p.segment || p.category)],
     ["Price", ...items.map(p => `<span data-money data-price="${p.price}">$${p.price}</span>`)],

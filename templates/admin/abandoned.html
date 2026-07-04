@@ -6,16 +6,16 @@
 
   {% if carts %}
   <div class="overflow-x-auto">
-    <table class="w-full min-w-[650px] text-sm">
+    <table class="admin-table-responsive w-full min-w-[650px] text-sm">
       <thead class="border-b-2 border-sand text-left text-xs font-bold uppercase tracking-wider"><tr><th class="py-3 pr-4">Email</th><th class="py-3 pr-4">Items</th><th class="py-3 pr-4">Value</th><th class="py-3 pr-4">Abandoned</th><th class="py-3">Actions</th></tr></thead>
       <tbody class="divide-y divide-sand">
         {% for cart in carts %}
         <tr>
-          <td class="py-3 pr-4 font-semibold">{{ cart.email }}</td>
-          <td class="py-3 pr-4 text-bark">{{ cart.items[:60] }}{% if cart.items|length > 60 %}…{% endif %}</td>
-          <td class="py-3 pr-4">${{ "%.2f"|format(cart.total) }}</td>
-          <td class="py-3 pr-4 text-bark">{{ cart.created_at[:16] }}</td>
-          <td class="py-3">
+          <td data-label="Email" class="py-3 pr-4 font-semibold">{{ cart.email }}</td>
+          <td data-label="Items" class="py-3 pr-4 text-bark">{{ cart.items[:60] }}{% if cart.items|length > 60 %}…{% endif %}</td>
+          <td data-label="Value" class="py-3 pr-4">CAD ${{ "%.2f"|format(cart.total) }}</td>
+          <td data-label="Abandoned" class="py-3 pr-4 text-bark">{{ cart.created_at[:16] }}</td>
+          <td data-label="Actions" class="py-3">
             <a href="mailto:{{ cart.email }}?subject=Your%20Aluy%C3%A8%20Naturals%20cart%20is%20waiting&body=Hi%2C%0A%0AWe%20noticed%20you%20left%20some%20items%20in%20your%20cart.%20Use%20code%20RITUAL10%20for%2010%25%20off%20your%20order.%0A%0AVisit%20our%20store%20to%20complete%20your%20ritual." class="text-xs font-semibold underline">Send Reminder</a>
           </td>
         </tr>

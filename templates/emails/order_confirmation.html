@@ -14,6 +14,13 @@
         <p style="font-size:12px;color:#594a3b;margin:0 0 4px;">ORDER NUMBER</p>
         <p style="font-size:24px;font-weight:bold;letter-spacing:0.05em;margin:0;">{{ order_number }}</p>
       </div>
+      <table style="width:100%;margin:0 0 24px;font-size:13px;color:#594a3b;">
+        <tr><td style="padding:4px 0;width:35%;">Order date</td><td>{{ order_date }}</td></tr>
+        <tr><td style="padding:4px 0;">Delivery address</td><td>{{ address_line }}</td></tr>
+        {% if phone %}<tr><td style="padding:4px 0;">Phone</td><td>{{ phone }}</td></tr>{% endif %}
+        <tr><td style="padding:4px 0;">Payment method</td><td>{{ payment_method }}</td></tr>
+        {% if transaction_id %}<tr><td style="padding:4px 0;">Transaction ID</td><td>{{ transaction_id }}</td></tr>{% endif %}
+      </table>
       <table style="width:100%;border-collapse:collapse;">
         {% for item in items %}
         <tr style="border-bottom:1px solid #e7d8c3;">
@@ -26,9 +33,9 @@
         {% endfor %}
       </table>
       <table style="width:100%;margin:16px 0 24px;">
-        <tr><td style="padding:8px 0;color:#594a3b;">Subtotal</td><td style="text-align:right;">${{ "%.2f"|format(subtotal) }}</td></tr>
-        <tr><td style="padding:8px 0;color:#594a3b;">Delivery</td><td style="text-align:right;">{{ 'Free' if delivery == 0 else '$%.2f'|format(delivery) }}</td></tr>
-        <tr style="border-top:2px solid #17130f;"><td style="padding:12px 0;font-weight:bold;font-size:16px;">Total</td><td style="text-align:right;font-weight:bold;font-size:16px;">${{ "%.2f"|format(total) }}</td></tr>
+        <tr><td style="padding:8px 0;color:#594a3b;">Subtotal</td><td style="text-align:right;">CAD ${{ "%.2f"|format(subtotal) }}</td></tr>
+        <tr><td style="padding:8px 0;color:#594a3b;">Shipping{% if zone_name %} ({{ zone_name }}){% endif %}</td><td style="text-align:right;">CAD ${{ "%.2f"|format(delivery) }}</td></tr>
+        <tr style="border-top:2px solid #17130f;"><td style="padding:12px 0;font-weight:bold;font-size:16px;">Total</td><td style="text-align:right;font-weight:bold;font-size:16px;">CAD ${{ "%.2f"|format(total) }}</td></tr>
       </table>
       <div style="text-align:center;">
         <a href="{{ site_url }}/track-order" style="display:inline-block;background:#17130f;color:#fff;padding:14px 32px;text-decoration:none;font-weight:bold;font-size:14px;">Track Your Order</a>

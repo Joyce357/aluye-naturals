@@ -89,7 +89,7 @@
       <div><p class="eyebrow text-neutral-600">Curated for your ritual</p><h2 class="section-heading mt-3">New This Season</h2></div>
       <a href="{{ url_for('shop', tag='New') }}" class="hidden items-center gap-2 text-sm font-bold underline sm:flex">Shop all {{ icon("arrow") }}</a>
     </div>
-    <div class="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3 lg:gap-6">
+    <div class="mt-8 grid grid-cols-2 gap-4 lg:grid-cols-3 lg:gap-6">
       {% for product in new_arrivals %}{{ product_card(product, loop.index0) }}{% endfor %}
     </div>
   </div>
@@ -104,7 +104,7 @@
       <div><p class="eyebrow text-neutral-600">Curated for your ritual</p><h2 class="section-heading mt-3">{{ segment }}</h2></div>
       <a href="{{ url_for('shop', category=segment) }}" class="hidden items-center gap-2 text-sm font-bold underline sm:flex">Shop all {{ icon("arrow") }}</a>
     </div>
-    <div class="mt-8 flex snap-x snap-mandatory gap-4 overflow-x-auto pb-5 lg:grid lg:grid-cols-4 lg:overflow-visible lg:pb-0">
+    <div data-product-carousel class="mt-8 flex snap-x snap-mandatory gap-4 overflow-x-auto pb-5 lg:grid lg:grid-cols-4 lg:overflow-visible lg:pb-0">
       {% for product in segment_products[:3] %}{{ product_card(product) }}{% endfor %}
     </div>
   </div>
@@ -116,7 +116,7 @@
       <div><p class="eyebrow text-neutral-600">Loved by the Aluyè community</p><h2 class="section-heading mt-3">Best Sellers</h2></div>
       <a href="{{ url_for('shop', tag='Best Seller') }}" class="hidden items-center gap-2 text-sm font-bold underline sm:flex">Shop all {{ icon("arrow") }}</a>
     </div>
-    <div class="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3 lg:gap-6">
+    <div class="mt-8 grid grid-cols-2 gap-4 lg:grid-cols-3 lg:gap-6">
       {% for product in best_sellers %}{{ product_card(product, loop.index0) }}{% endfor %}
     </div>
   </div>
@@ -127,7 +127,7 @@
 
 {% if homepage_settings.get('brand_story', true) %}
 <section class="grid bg-botanical text-white lg:grid-cols-2">
-  <img src="{{ url_for('media', collection='hero', filename='aluye-beard-hero.webp') }}" alt="Aluyè Naturals men’s beard care range" width="1600" height="901" loading="lazy" class="h-full min-h-[28rem] w-full object-cover">
+  <img src="{{ url_for('media', collection='hero', filename='aluye-shea-butter-hero.webp') }}" alt="Aluyè Naturals whipped shea butter, freshly scooped" width="1536" height="1024" loading="lazy" class="h-full min-h-[28rem] w-full object-cover">
   <div class="flex items-center px-6 py-16 sm:px-12 lg:px-20">
     <div class="max-w-xl"><p class="eyebrow">From West Africa, with care</p><h2 class="section-heading mt-4">Heritage ingredients. Modern everyday care.</h2><p class="mt-6 text-lg leading-8 text-white/85">Our formulas begin with ingredients people have trusted for generations—unrefined shea, African black soap and purposeful botanical oils—then shape them into practical rituals for today.</p><a href="{{ url_for('about') }}" class="mt-8 inline-flex min-h-12 items-center bg-white px-6 text-sm font-bold text-black">Read our story</a></div>
   </div>

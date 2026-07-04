@@ -1,0 +1,40 @@
+<!doctype html>
+<html>
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>New Order</title></head>
+<body style="margin:0;padding:0;background:#f9f6f1;font-family:Arial,sans-serif;color:#17130f;">
+  <div style="max-width:600px;margin:0 auto;">
+    <div style="background:#1a1a1a;padding:20px 24px;">
+      <p style="margin:0;color:#fff;font-weight:bold;font-size:16px;">New order received — {{ order_number }}</p>
+    </div>
+    <div style="background:#fff;padding:32px;">
+      <table style="width:100%;margin:0 0 20px;font-size:13px;">
+        <tr><td style="padding:4px 0;color:#594a3b;width:35%;">Customer</td><td>{{ customer_name }}</td></tr>
+        <tr><td style="padding:4px 0;color:#594a3b;">Email</td><td>{{ customer_email }}</td></tr>
+        {% if phone %}<tr><td style="padding:4px 0;color:#594a3b;">Phone</td><td>{{ phone }}</td></tr>{% endif %}
+        <tr><td style="padding:4px 0;color:#594a3b;">Delivery address</td><td>{{ address_line }}</td></tr>
+        <tr><td style="padding:4px 0;color:#594a3b;">Order date</td><td>{{ order_date }}</td></tr>
+        <tr><td style="padding:4px 0;color:#594a3b;">Payment method</td><td>{{ payment_method }}</td></tr>
+        {% if transaction_id %}<tr><td style="padding:4px 0;color:#594a3b;">Transaction ID</td><td>{{ transaction_id }}</td></tr>{% endif %}
+      </table>
+      <table style="width:100%;border-collapse:collapse;margin:0 0 16px;">
+        <tr style="border-bottom:1px solid #e7d8c3;"><td style="padding:8px 0;font-weight:bold;">Item</td><td style="padding:8px 0;font-weight:bold;text-align:center;">Qty</td><td style="padding:8px 0;font-weight:bold;text-align:right;">Total</td></tr>
+        {% for item in items %}
+        <tr style="border-bottom:1px solid #e7d8c3;">
+          <td style="padding:8px 0;">{{ item.name if item.name is defined else item.product.name }}</td>
+          <td style="padding:8px 0;text-align:center;">{{ item.quantity }}</td>
+          <td style="padding:8px 0;text-align:right;">CAD ${{ "%.2f"|format(item.total if item.total is defined else item.line_total) }}</td>
+        </tr>
+        {% endfor %}
+      </table>
+      <table style="width:100%;font-size:14px;">
+        <tr><td style="padding:4px 0;color:#594a3b;">Subtotal</td><td style="text-align:right;">CAD ${{ "%.2f"|format(subtotal) }}</td></tr>
+        <tr><td style="padding:4px 0;color:#594a3b;">Shipping{% if zone_name %} ({{ zone_name }}){% endif %}</td><td style="text-align:right;">CAD ${{ "%.2f"|format(delivery) }}</td></tr>
+        <tr style="border-top:2px solid #17130f;"><td style="padding:10px 0;font-weight:bold;">Total</td><td style="text-align:right;font-weight:bold;">CAD ${{ "%.2f"|format(total) }}</td></tr>
+      </table>
+      <div style="margin-top:24px;text-align:center;">
+        <a href="{{ site_url }}/admin/orders" style="display:inline-block;background:#17130f;color:#fff;padding:12px 28px;text-decoration:none;font-weight:bold;font-size:13px;">View in Admin</a>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

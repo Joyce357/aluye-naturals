@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+
+{% block content %}
+<section class="page-shell py-20 text-center">
+  <div class="mx-auto max-w-md">
+    {% if status == "cancelled" %}
+    <p class="eyebrow text-neutral-500">Payment cancelled</p>
+    <h1 class="mt-3 font-display text-5xl font-semibold">No charge was made</h1>
+    <p class="mt-6 text-neutral-600">You cancelled the PayPal payment before it completed. Your bag is still saved — you can try again or choose another payment method.</p>
+    {% else %}
+    <p class="eyebrow text-neutral-500">Payment failed</p>
+    <h1 class="mt-3 font-display text-5xl font-semibold">Something went wrong</h1>
+    <p class="mt-6 text-neutral-600">We couldn't complete your PayPal payment. You have not been charged. Please try again or use another payment method.</p>
+    {% endif %}
+    <a href="{{ url_for('checkout') }}" class="btn-primary mt-8 inline-flex">Return to checkout</a>
+  </div>
+</section>
+{% endblock %}

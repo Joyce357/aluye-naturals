@@ -6,18 +6,18 @@
 
   {% if returns %}
   <div class="overflow-x-auto">
-    <table class="w-full min-w-[760px] text-sm">
+    <table class="admin-table-responsive w-full min-w-[760px] text-sm">
       <thead class="border-b-2 border-sand text-left text-xs font-bold uppercase tracking-wider"><tr><th class="py-3 pr-4">Ref</th><th class="py-3 pr-4">Order</th><th class="py-3 pr-4">Email</th><th class="py-3 pr-4">Reason</th><th class="py-3 pr-4">Refund</th><th class="py-3 pr-4">Status</th><th class="py-3">Update</th></tr></thead>
       <tbody class="divide-y divide-sand">
         {% for ret in returns %}
         <tr>
-          <td class="py-3 pr-4 font-semibold">{{ ret.reference }}</td>
-          <td class="py-3 pr-4">{{ ret.order_number }}</td>
-          <td class="py-3 pr-4 text-bark">{{ ret.email }}</td>
-          <td class="py-3 pr-4 text-bark">{{ ret.reason }}</td>
-          <td class="py-3 pr-4 text-bark">{{ ret.refund_method }}</td>
-          <td class="py-3 pr-4"><span class="px-2 py-1 text-xs font-bold uppercase {% if ret.status == 'Approved' %}bg-success text-white{% elif ret.status == 'Rejected' %}bg-error text-white{% elif ret.status == 'Processed' %}bg-botanical text-white{% else %}bg-sand{% endif %}">{{ ret.status }}</span></td>
-          <td class="py-3">
+          <td data-label="Ref" class="py-3 pr-4 font-semibold">{{ ret.reference }}</td>
+          <td data-label="Order" class="py-3 pr-4">{{ ret.order_number }}</td>
+          <td data-label="Email" class="py-3 pr-4 text-bark">{{ ret.email }}</td>
+          <td data-label="Reason" class="py-3 pr-4 text-bark">{{ ret.reason }}</td>
+          <td data-label="Refund" class="py-3 pr-4 text-bark">{{ ret.refund_method }}</td>
+          <td data-label="Status" class="py-3 pr-4"><span class="px-2 py-1 text-xs font-bold uppercase {% if ret.status == 'Approved' %}bg-success text-white{% elif ret.status == 'Rejected' %}bg-error text-white{% elif ret.status == 'Processed' %}bg-botanical text-white{% else %}bg-sand{% endif %}">{{ ret.status }}</span></td>
+          <td data-label="Update" class="py-3">
             <form method="post" class="flex flex-col gap-2">
               <input type="hidden" name="return_id" value="{{ ret.id }}">
               <select name="status" class="min-h-9 border border-sand bg-cream px-2 text-xs">

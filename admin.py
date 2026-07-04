@@ -10,6 +10,7 @@ from pathlib import Path
 from flask import (
     Blueprint,
     Response,
+    abort,
     current_app,
     flash,
     g,
@@ -55,7 +56,28 @@ NAV_GROUPS = [
     ]),
     ("system", "System", [
         ("account", "Admin Users"),
+        ("issues_admin", "Site Issues"),
     ]),
+]
+
+SITE_ISSUES = [
+    {"priority": "Critical", "title": "Meta description showing broken \"trans-\" template variables", "status": "resolved"},
+    {"priority": "Critical", "title": "Cart drawer X button not closing the cart", "status": "not_reproducible"},
+    {"priority": "Critical", "title": "Site not responsive on mobile — product grid breaks on small screens", "status": "fixed_local"},
+    {"priority": "Critical", "title": "Stock levels not reducing after an order is placed", "status": "open"},
+    {"priority": "Critical", "title": "Discount popup not capturing emails correctly (no validation/feedback)", "status": "fixed_local"},
+    {"priority": "High", "title": "WhatsApp button appearing on the live site", "status": "fixed_local"},
+    {"priority": "High", "title": "Address showing full street address instead of Toronto, Ontario, Canada", "status": "fixed_local"},
+    {"priority": "High", "title": "Welcome subscription email not sending to new subscribers", "status": "fixed_local"},
+    {"priority": "High", "title": "Social media links not connected to real accounts", "status": "resolved"},
+    {"priority": "Medium", "title": "Product images showing in circular format — should be square", "status": "not_reproducible"},
+    {"priority": "Medium", "title": "Maintenance mode not readily usable during development", "status": "fixed_local"},
+    {"priority": "Medium", "title": "No coming soon page for new visitors", "status": "skipped"},
+    {"priority": "Medium", "title": "Footer accordion not working on mobile", "status": "not_reproducible"},
+    {"priority": "Medium", "title": "Service worker intercepting admin routes and showing offline page", "status": "resolved"},
+    {"priority": "Low", "title": "Currency selector in footer showing incorrect defaults", "status": "open"},
+    {"priority": "Low", "title": "Some admin sidebar links leading to placeholder pages", "status": "not_reproducible"},
+    {"priority": "Low", "title": "Missing OG image for social sharing", "status": "not_reproducible"},
 ]
 
 NAV_ITEMS = [(key, label) for _, _, items in NAV_GROUPS for key, label in items]
@@ -220,6 +242,38 @@ def init_db():
         );
         """
     )
+    try:
+        db.execute("ALTER TABLE subscribers ADD COLUMN source TEXT DEFAULT 'website'")
+    except sqlite3.OperationalError:
+        pass
+    try:
+        db.execute("ALTER TABLE shipping_zones ADD COLUMN postal_prefixes TEXT DEFAULT ''")
+    except sqlite3.OperationalError:
+        pass
+    try:
+        db.execute("ALTER TABLE orders ADD COLUMN transaction_id TEXT DEFAULT ''")
+    except sqlite3.OperationalError:
+        pass
+    try:
+        db.execute("ALTER TABLE orders ADD COLUMN shipping_fee REAL DEFAULT 0")
+    except sqlite3.OperationalError:
+        pass
+    try:
+        db.execute("ALTER TABLE orders ADD COLUMN phone TEXT DEFAULT ''")
+    except sqlite3.OperationalError:
+        pass
+    try:
+        db.execute("ALTER TABLE notifications ADD COLUMN related_type TEXT DEFAULT ''")
+    except sqlite3.OperationalError:
+        pass
+    try:
+        db.execute("ALTER TABLE notifications ADD COLUMN related_id TEXT DEFAULT ''")
+    except sqlite3.OperationalError:
+        pass
+    try:
+        db.execute("ALTER TABLE notifications ADD COLUMN archived INTEGER DEFAULT 0")
+    except sqlite3.OperationalError:
+        pass
     if not db.execute("SELECT 1 FROM admin_users LIMIT 1").fetchone():
         db.execute(
             "INSERT INTO admin_users(username,name,email,password_hash,role) VALUES(?,?,?,?,?)",
@@ -235,12 +289,12 @@ def init_db():
         )
     if not db.execute("SELECT 1 FROM shipping_zones LIMIT 1").fetchone():
         db.executemany(
-            "INSERT INTO shipping_zones(name,rate,threshold,delivery_days) VALUES(?,?,?,?)",
+            "INSERT INTO shipping_zones(name,rate,threshold,delivery_days,postal_prefixes) VALUES(?,?,?,?,?)",
             [
-                ("Canada", 8, 50, "2–5 business days"),
-                ("United Kingdom", 14, 100, "5–8 business days"),
-                ("Nigeria", 6, 45, "2–4 business days"),
-                ("Rest of World", 20, 150, "7–14 business days"),
+                ("Ontario (local)", 8, 0, "1–3 business days", "K,L,M,N,P"),
+                ("Rest of Canada", 15, 0, "3–7 business days", ""),
+                ("United States", 25, 0, "5–10 business days", ""),
+                ("Rest of World", 35, 0, "10–21 business days", ""),
             ],
         )
     if not db.execute("SELECT 1 FROM discounts LIMIT 1").fetchone():
@@ -370,10 +424,11 @@ def record_activity(action):
     get_db().commit()
 
 
-def add_notification(kind, title, detail):
+def add_notification(kind, title, detail, related_type="", related_id=""):
     get_db().execute(
-        "INSERT INTO notifications(kind,title,detail,created_at) VALUES(?,?,?,?)",
-        (kind, title, detail, datetime.now().isoformat(timespec="minutes")),
+        """INSERT INTO notifications(kind,title,detail,created_at,related_type,related_id)
+           VALUES(?,?,?,?,?,?)""",
+        (kind, title, detail, datetime.now().isoformat(timespec="minutes"), related_type, related_id),
     )
     get_db().commit()
 
@@ -401,19 +456,158 @@ def record_product_event(slug, event):
 
 def save_contact_message(name, email, subject, message):
     db = get_db()
-    db.execute(
+    cursor = db.execute(
         "INSERT INTO messages(name,email,subject,message,created_at) VALUES(?,?,?,?,?)",
         (name, email, subject, message, datetime.now().isoformat(timespec="minutes")),
     )
     db.commit()
-    add_notification("message", "New contact message", f"{name}: {subject}")
+    add_notification(
+        "message", "New contact message", f"{name}: {subject}",
+        related_type="message", related_id=str(cursor.lastrowid),
+    )
 
 
-def save_order(order_number, customer, items, total):
+def get_admin_email():
+    settings = load_setting("settings", {}) or {}
+    return (
+        settings.get("admin_email")
+        or settings.get("contact_email")
+        or os.environ.get("ADMIN_EMAIL", "admin@aluyenaturals.com")
+    )
+
+
+def send_mail(subject, recipients, html, reply_to=None):
+    """Send an email using admin-configured SMTP settings (Global Settings -> Integrations),
+    falling back to environment variables. Returns (success, error_message)."""
+    from flask import current_app
+
+    try:
+        from flask_mail import Mail, Message as MailMessage
+    except ImportError as exc:
+        print(f"Email send failed ({subject} -> {recipients}): flask_mail not installed ({exc})")
+        return False, "Email is not available (flask_mail is not installed on the server)."
+
+    settings = load_setting("settings", {}) or {}
+    mail_server = settings.get("mail_server") or current_app.config.get("MAIL_SERVER")
+    mail_port = settings.get("mail_port") or current_app.config.get("MAIL_PORT")
+    mail_username = settings.get("mail_username") or current_app.config.get("MAIL_USERNAME")
+    mail_password = os.environ.get("MAIL_PASSWORD") or current_app.config.get("MAIL_PASSWORD")
+    sender_email = settings.get("contact_email") or mail_username or current_app.config.get(
+        "MAIL_DEFAULT_SENDER"
+    )
+
+    current_app.config["MAIL_SERVER"] = mail_server
+    try:
+        current_app.config["MAIL_PORT"] = int(mail_port)
+    except (TypeError, ValueError):
+        pass
+    current_app.config["MAIL_USERNAME"] = mail_username
+    current_app.config["MAIL_PASSWORD"] = mail_password
+    current_app.config["MAIL_DEFAULT_SENDER"] = sender_email
+    current_app.config["MAIL_SUPPRESS_SEND"] = not mail_username
+
+    try:
+        mail = Mail(current_app)
+        msg = MailMessage(
+            subject=subject,
+            sender=("Aluyè Naturals", sender_email) if sender_email else None,
+            recipients=recipients,
+            html=html,
+            reply_to=reply_to,
+        )
+        mail.send(msg)
+        return True, None
+    except Exception as exc:
+        print(f"Email send failed ({subject} -> {recipients}): {exc}")
+        return False, str(exc)
+
+
+def send_welcome_email(email, source="website"):
+    from flask import current_app, render_template
+
+    first_name = email.split("@")[0].replace(".", " ").replace("_", " ").title()
+    discount_code = "RITUAL10" if source == "exit_popup" else "RITUAL15"
+    discount_percent = 10 if source == "exit_popup" else 15
+    featured_products = [p for p in PRODUCTS_REF if "Best Seller" in p.get("tags", [])][:3]
+
+    html_body = render_template(
+        "emails/welcome.html",
+        first_name=first_name,
+        email=email,
+        discount_code=discount_code,
+        discount_percent=discount_percent,
+        featured_products=featured_products,
+        site_url=current_app.config.get("SITE_URL", ""),
+    )
+    success, error = send_mail(
+        subject="Welcome to Aluyè Naturals 🌿 — Your exclusive "
+        f"{discount_percent}% off is inside",
+        recipients=[email],
+        html=html_body,
+    )
+    if not success:
+        add_notification("email_error", "Welcome email failed", f"{email}: {error}")
+    return success
+
+
+CANADIAN_PROVINCE_PREFIXES = {
+    "AB": "T", "BC": "V", "MB": "R", "NB": "E", "NL": "A", "NS": "B",
+    "ON": "KLMNP", "PE": "C", "QC": "GHJ", "SK": "S", "NT": "X", "NU": "X", "YT": "Y",
+}
+
+
+def calculate_shipping(postal_code, country, method="standard"):
+    """Zone-based shipping calculation (no external geocoding API).
+    Returns dict: {available, rate, zone_name, needs_quote}."""
+    settings = load_setting("settings", {}) or {}
+    if method == "pickup" and settings.get("shipping_pickup_enabled"):
+        return {"available": True, "rate": 0.0, "zone_name": "Local pickup", "needs_quote": False}
+
+    country_norm = (country or "").strip().lower()
+    postal_norm = (postal_code or "").strip().upper().replace(" ", "")
+    fsa_letter = postal_norm[0] if postal_norm else ""
+    is_canada = "canada" in country_norm or country_norm in ("ca", "can")
+    is_usa = country_norm in ("us", "usa", "united states", "united states of america")
+
+    zones = get_db().execute("SELECT * FROM shipping_zones WHERE enabled=1").fetchall()
+
+    if is_canada:
+        for zone in zones:
+            prefixes = [p.strip() for p in (zone["postal_prefixes"] or "").split(",") if p.strip()]
+            if prefixes and fsa_letter in prefixes:
+                return {"available": True, "rate": zone["rate"], "zone_name": zone["name"], "needs_quote": False}
+        for zone in zones:
+            if not (zone["postal_prefixes"] or "").strip() and "canada" in zone["name"].lower():
+                return {"available": True, "rate": zone["rate"], "zone_name": zone["name"], "needs_quote": False}
+    elif is_usa:
+        for zone in zones:
+            if "united states" in zone["name"].lower():
+                return {"available": True, "rate": zone["rate"], "zone_name": zone["name"], "needs_quote": False}
+    else:
+        for zone in zones:
+            if "rest of world" in zone["name"].lower():
+                return {"available": True, "rate": zone["rate"], "zone_name": zone["name"], "needs_quote": False}
+
+    needs_quote = bool(settings.get("shipping_manual_quote_enabled"))
+    return {"available": False, "rate": None, "zone_name": None, "needs_quote": needs_quote}
+
+
+def save_order(
+    order_number,
+    customer,
+    items,
+    subtotal,
+    shipping_fee=0,
+    payment_method="Bank Transfer / Online Payment",
+    status="Pending",
+    transaction_id="",
+):
     db = get_db()
+    total = subtotal + shipping_fee
     db.execute(
-        """INSERT OR IGNORE INTO orders(order_number,customer_name,email,address,items,total,status,created_at,updated_at)
-           VALUES(?,?,?,?,?,?,?,?,?)""",
+        """INSERT OR IGNORE INTO orders(order_number,customer_name,email,address,items,total,status,
+           payment_method,transaction_id,shipping_fee,phone,created_at,updated_at)
+           VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)""",
         (
             order_number,
             f"{customer['first_name']} {customer['last_name']}",
@@ -429,6 +623,7 @@ def save_order(order_number, customer, items, total):
             json.dumps(
                 [
                     {
+                        "slug": item["product"]["slug"],
                         "name": item["product"]["name"],
                         "quantity": item["quantity"],
                         "total": item["line_total"],
@@ -437,13 +632,52 @@ def save_order(order_number, customer, items, total):
                 ]
             ),
             total,
-            "Pending",
+            status,
+            payment_method,
+            transaction_id,
+            shipping_fee,
+            customer.get("phone", ""),
             datetime.now().isoformat(timespec="minutes"),
             datetime.now().isoformat(timespec="minutes"),
         ),
     )
     db.commit()
-    add_notification("order", "New order placed", f"{order_number} · ${total:.2f}")
+    order_row = db.execute("SELECT id FROM orders WHERE order_number=?", (order_number,)).fetchone()
+    add_notification(
+        "order", "New order placed", f"{order_number} · CAD ${total:.2f}",
+        related_type="order", related_id=str(order_row["id"]) if order_row else "",
+    )
+    return total
+
+
+def deduct_stock(items):
+    db = get_db()
+    for item in items:
+        slug = item["product"]["slug"]
+        quantity = item["quantity"]
+        row = db.execute("SELECT stock FROM products WHERE slug=?", (slug,)).fetchone()
+        if not row:
+            continue
+        new_stock = max(0, row["stock"] - quantity)
+        db.execute("UPDATE products SET stock=? WHERE slug=?", (new_stock, slug))
+        if new_stock < 5:
+            add_notification(
+                "stock", "Low stock alert", f"{item['product']['name']} has {new_stock} units remaining."
+            )
+    db.commit()
+
+
+def restore_stock(order_items):
+    db = get_db()
+    for item in order_items:
+        slug = item.get("slug")
+        if not slug:
+            continue
+        db.execute(
+            "UPDATE products SET stock = stock + ? WHERE slug=?",
+            (item["quantity"], slug),
+        )
+    db.commit()
 
 
 def admin_required(view):
@@ -489,7 +723,7 @@ def inject_admin_context():
             "SELECT COUNT(*) c FROM messages WHERE status='unread'"
         ).fetchone()["c"],
         "admin_unread_notifications": db.execute(
-            "SELECT COUNT(*) c FROM notifications WHERE is_read=0"
+            "SELECT COUNT(*) c FROM notifications WHERE is_read=0 AND archived=0"
         ).fetchone()["c"],
     }
 
@@ -716,9 +950,11 @@ def order_detail(order_id):
     db = get_db()
     if request.method == "POST":
         old_order = db.execute(
-            "SELECT order_number,status FROM orders WHERE id=?", (order_id,)
+            "SELECT order_number,status,items FROM orders WHERE id=?", (order_id,)
         ).fetchone()
         new_status = request.form.get("status")
+        if new_status == "Cancelled" and old_order and old_order["status"] != "Cancelled":
+            restore_stock(json.loads(old_order["items"]))
         db.execute(
             "UPDATE orders SET status=?,tracking=?,updated_at=? WHERE id=?",
             (
@@ -794,28 +1030,17 @@ def message_detail(message_id):
             return redirect(url_for("admin.message_detail", message_id=message_id))
 
         if action == "send" and reply_text:
-            sent = False
-            try:
-                from flask_mail import Mail, Message as MailMessage
-                mail = Mail(current_app)
-                site_settings = load_setting("settings", {}) or {}
-                sender_email = site_settings.get("contact_email") or current_app.config.get("MAIL_USERNAME") or "noreply@aluyenaturals.com"
-                email_html = render_template(
-                    "emails/reply.html",
-                    reply_text=reply_text,
-                    customer_name=msg["name"],
-                    site_url=current_app.config.get("SITE_URL", ""),
-                )
-                email_msg = MailMessage(
-                    subject=f"Re: {msg['subject']}",
-                    sender=sender_email,
-                    recipients=[msg["email"]],
-                    html=email_html,
-                )
-                mail.send(email_msg)
-                sent = True
-            except Exception:
-                sent = False
+            email_html = render_template(
+                "emails/reply.html",
+                reply_text=reply_text,
+                customer_name=msg["name"],
+                site_url=current_app.config.get("SITE_URL", ""),
+            )
+            sent, mail_error = send_mail(
+                subject=f"Re: {msg['subject']}",
+                recipients=[msg["email"]],
+                html=email_html,
+            )
 
             db.execute(
                 "INSERT INTO message_replies(message_id, reply_text, replied_by, created_at) VALUES(?,?,?,?)",
@@ -828,7 +1053,7 @@ def message_detail(message_id):
             if sent:
                 flash(f"Reply sent to {msg['email']} ✓", "success")
             else:
-                flash("Reply saved but email could not be sent. Check SMTP settings in .env.", "error")
+                flash(f"Reply saved but email could not be sent: {mail_error}. Check SMTP settings in Global Settings → Integrations.", "error")
             return redirect(url_for("admin.message_detail", message_id=message_id))
 
     replies = db.execute(
@@ -848,24 +1073,21 @@ def message_detail(message_id):
 
 @admin_bp.route("/settings/test-email", methods=["POST"])
 def test_email():
-    try:
-        from flask_mail import Mail, Message as MailMessage
-        mail = Mail(current_app)
-        admin_email = current_app.config.get("MAIL_USERNAME", "")
-        if not admin_email:
-            flash("No MAIL_USERNAME configured in .env.", "error")
+    settings = load_setting("settings", {}) or {}
+    recipient = settings.get("mail_username") or current_app.config.get("MAIL_USERNAME", "")
+    if not recipient:
+        flash("No SMTP username configured. Add one in Global Settings → Integrations.", "error")
+    else:
+        sent, error = send_mail(
+            subject="Aluyè Naturals — Test Email",
+            recipients=[recipient],
+            html="<p>This is a test email from your Aluyè Naturals admin panel. Email is configured correctly.</p>",
+        )
+        if sent:
+            flash(f"Test email sent to {recipient} ✓", "success")
         else:
-            email_msg = MailMessage(
-                subject="Aluyè Naturals — Test Email",
-                sender=admin_email,
-                recipients=[admin_email],
-                html="<p>This is a test email from your Aluyè Naturals admin panel. Email is configured correctly.</p>",
-            )
-            mail.send(email_msg)
-            flash(f"Test email sent to {admin_email} ✓", "success")
-    except Exception as e:
-        flash(f"Email failed: {str(e)}", "error")
-    return redirect(url_for("admin.configurable_section", section="settings"))
+            flash(f"Email failed: {error}", "error")
+    return redirect(url_for("admin.global_settings") + "?tab=integrations")
 
 
 @admin_bp.post("/notifications/read")
@@ -879,7 +1101,7 @@ def notifications_read():
 @admin_bp.get("/notifications")
 def notifications():
     rows = get_db().execute(
-        "SELECT * FROM notifications ORDER BY created_at DESC"
+        "SELECT * FROM notifications WHERE archived=0 ORDER BY created_at DESC"
     ).fetchall()
     return render_template(
         "admin/notifications.html",
@@ -888,10 +1110,52 @@ def notifications():
     )
 
 
+def _notification_related_url(row):
+    if row["related_type"] == "order" and row["related_id"]:
+        return url_for("admin.order_detail", order_id=row["related_id"])
+    if row["related_type"] == "message" and row["related_id"]:
+        return url_for("admin.message_detail", message_id=row["related_id"])
+    return None
+
+
+@admin_bp.get("/notifications/<int:notification_id>")
+def notification_detail(notification_id):
+    db = get_db()
+    row = db.execute("SELECT * FROM notifications WHERE id=?", (notification_id,)).fetchone()
+    if not row:
+        abort(404)
+    if not row["is_read"]:
+        db.execute("UPDATE notifications SET is_read=1 WHERE id=?", (notification_id,))
+        db.commit()
+        row = db.execute("SELECT * FROM notifications WHERE id=?", (notification_id,)).fetchone()
+    return render_template(
+        "admin/notification_detail.html",
+        admin_section="notifications",
+        notification=row,
+        related_url=_notification_related_url(row),
+    )
+
+
+@admin_bp.post("/notifications/<int:notification_id>/archive")
+def notification_archive(notification_id):
+    get_db().execute("UPDATE notifications SET archived=1 WHERE id=?", (notification_id,))
+    get_db().commit()
+    flash("Notification archived.", "success")
+    return redirect(url_for("admin.notifications"))
+
+
+@admin_bp.post("/notifications/<int:notification_id>/delete")
+def notification_delete(notification_id):
+    get_db().execute("DELETE FROM notifications WHERE id=?", (notification_id,))
+    get_db().commit()
+    flash("Notification deleted.", "success")
+    return redirect(url_for("admin.notifications"))
+
+
 @admin_bp.route("/homepage", methods=["GET", "POST"])
 def homepage():
     defaults = {
-        "announcement_1": "Free shipping on orders over $50",
+        "announcement_1": "Delivering across Canada",
         "announcement_2": "Small-batch care, rooted in nature",
         "announcement_3": "New arrivals every month — Shop now",
         "hero_headline": "Shea care, made beautifully modern.",
@@ -961,8 +1225,7 @@ SETTINGS_DEFAULTS = {
     "store_name": "Aluyè Naturals",
     "tagline": "Body · Mind · Soul",
     "store_status": "live",
-    "base_currency": "USD",
-    "free_shipping_threshold": "50",
+    "base_currency": "CAD",
     "signup_heading": "Get 15% off your first ritual",
     "signup_subheading": "Join for product launches, ingredient guides and members-only offers.",
     "copyright_text": "© 2026 Aluyè Naturals. Body. Mind. Soul.",
@@ -1037,6 +1300,18 @@ def global_settings():
         settings = load_setting("settings", {}) or {}
         homepage = load_setting("homepage", {}) or {}
         target = homepage if tab == "homepage" else settings
+        required_by_tab = {
+            "general": ["store_name"],
+            "contact": ["contact_email"],
+        }
+        missing = [
+            field
+            for field in required_by_tab.get(tab, [])
+            if not request.form.get(field, "").strip()
+        ]
+        if missing:
+            flash("Please complete all required fields before saving.", "error")
+            return redirect(url_for("admin.global_settings") + f"?tab={tab}")
         for key, value in request.form.items():
             if key == "tab":
                 continue
@@ -1048,13 +1323,30 @@ def global_settings():
         for field in checkbox_fields:
             if tab in ("homepage", "store", "newsletter"):
                 target[field] = field in request.form
+        if tab == "integrations":
+            target["paypal_sandbox"] = "paypal_sandbox" in request.form
+            mail_password = request.form.get("mail_password", "").strip()
+            if mail_password:
+                save_env_secret("MAIL_PASSWORD", mail_password)
+            target["mail_password"] = ""
+            target["mail_configured"] = bool(mail_password or settings.get("mail_configured"))
+            secret_fields = ("stripe_secret", "paypal_secret", "flutterwave_secret", "paystack_secret")
+            for field in secret_fields:
+                secret = request.form.get(field, "").strip()
+                provider = field.removesuffix("_secret")
+                if secret:
+                    save_env_secret(field.upper(), secret)
+                target[field] = ""
+                target[f"{provider}_configured"] = bool(
+                    secret or settings.get(f"{provider}_configured")
+                )
         if tab == "homepage":
             save_setting("homepage", homepage)
         else:
             save_setting("settings", settings)
         record_activity(f"Updated {tab} settings")
         flash("Settings saved ✓", "success")
-        return redirect(url_for("admin.global_settings"))
+        return redirect(url_for("admin.global_settings") + f"?tab={tab}")
 
     all_settings = {**SETTINGS_DEFAULTS}
     all_settings.update(load_setting("settings", {}) or {})
@@ -1073,25 +1365,41 @@ def global_settings():
 def shipping():
     db = get_db()
     if request.method == "POST":
-        if request.form.get("delete"):
+        if request.form.get("form_type") == "settings":
+            settings = load_setting("settings", {}) or {}
+            settings["shipping_pickup_enabled"] = "shipping_pickup_enabled" in request.form
+            settings["shipping_manual_quote_enabled"] = "shipping_manual_quote_enabled" in request.form
+            save_setting("settings", settings)
+            flash("Shipping settings updated.", "success")
+        elif request.form.get("delete"):
             db.execute("DELETE FROM shipping_zones WHERE id=?", (request.form["delete"],))
+            db.commit()
+            flash("Shipping zone deleted.", "success")
         else:
-            db.execute(
-                "INSERT INTO shipping_zones(name,rate,threshold,delivery_days,enabled) VALUES(?,?,?,?,?)",
-                (
-                    request.form.get("name"),
-                    float(request.form.get("rate") or 0),
-                    float(request.form.get("threshold") or 0),
-                    request.form.get("delivery_days"),
-                    1,
-                ),
-            )
-        db.commit()
-        flash("Shipping zones updated.", "success")
+            name = request.form.get("name", "").strip()
+            if not name:
+                flash("Zone name is required.", "error")
+            else:
+                db.execute(
+                    "INSERT INTO shipping_zones(name,rate,threshold,delivery_days,postal_prefixes,enabled) VALUES(?,?,?,?,?,?)",
+                    (
+                        name,
+                        float(request.form.get("rate") or 0),
+                        0,
+                        request.form.get("delivery_days"),
+                        request.form.get("postal_prefixes", "").strip().upper(),
+                        1,
+                    ),
+                )
+                db.commit()
+                flash("Shipping zone added.", "success")
+        return redirect(url_for("admin.shipping"))
+    settings = load_setting("settings", {}) or {}
     return render_template(
         "admin/shipping.html",
         admin_section="shipping",
         zones=db.execute("SELECT * FROM shipping_zones ORDER BY name").fetchall(),
+        s=settings,
     )
 
 
@@ -1237,6 +1545,15 @@ def reviews_admin():
     )
 
 
+@admin_bp.get("/issues")
+def issues_admin():
+    return render_template(
+        "admin/issues.html",
+        admin_section="issues_admin",
+        issues=SITE_ISSUES,
+    )
+
+
 @admin_bp.get("/subscribers")
 def subscribers_admin():
     rows = get_db().execute(
@@ -1246,6 +1563,22 @@ def subscribers_admin():
         "admin/subscribers.html",
         admin_section="subscribers_admin",
         subscribers=rows,
+    )
+
+
+@admin_bp.get("/subscribers/export.csv")
+def subscribers_export():
+    rows = get_db().execute(
+        "SELECT email, source, created_at FROM subscribers ORDER BY created_at DESC"
+    ).fetchall()
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(["Email", "Source", "Subscribed", "Status"])
+    writer.writerows([(row["email"], row["source"] or "website", row["created_at"], "Active") for row in rows])
+    return Response(
+        output.getvalue(),
+        mimetype="text/csv",
+        headers={"Content-Disposition": "attachment; filename=aluye-subscribers.csv"},
     )
 
 

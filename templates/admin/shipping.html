@@ -1,4 +1,46 @@
 {% extends "admin/base.html" %}{% block title %}Shipping | Aluyè Admin{% endblock %}{% block content %}
-<div><p class="text-xs uppercase tracking-wider text-clay">Logistics</p><h1 class="mt-2 font-display text-5xl font-semibold">Shipping & Delivery</h1></div>
-<div class="mt-8 grid gap-6 xl:grid-cols-[1fr_22rem]"><div class="overflow-x-auto border border-sand bg-white"><table class="w-full min-w-[650px] text-left text-sm"><thead class="bg-cream text-xs uppercase text-bark"><tr><th class="p-4">Zone</th><th class="p-4">Flat rate</th><th class="p-4">Free over</th><th class="p-4">Estimate</th><th></th></tr></thead><tbody>{% for zone in zones %}<tr class="border-t border-sand"><td class="p-4 font-semibold">{{ zone.name }}</td><td class="p-4">${{ zone.rate }}</td><td class="p-4">${{ zone.threshold }}</td><td class="p-4">{{ zone.delivery_days }}</td><td class="p-4"><form method="post"><button name="delete" value="{{ zone.id }}" data-confirm="Delete this shipping zone?" class="text-xs font-semibold text-error">Delete</button></form></td></tr>{% endfor %}</tbody></table></div><form method="post" class="h-fit border border-sand bg-white p-6"><h2 class="font-display text-2xl font-semibold">Add zone</h2>{% for field,label,type in [("name","Zone name","text"),("rate","Flat rate","number"),("threshold","Free shipping threshold","number"),("delivery_days","Estimated delivery","text")] %}<label class="mt-4 grid gap-2 text-sm font-semibold">{{ label }}<input name="{{ field }}" type="{{ type }}" required class="min-h-11 border border-sand px-3"></label>{% endfor %}<button class="btn-primary mt-5 w-full">Add zone</button></form></div>
+<div><p class="text-xs uppercase tracking-wider text-clay">Logistics</p><h1 class="mt-2 font-display text-5xl font-semibold">Shipping & Delivery</h1><p class="mt-2 text-sm text-bark">Zone-based delivery pricing — no free shipping. Ontario FSA prefixes (first postal code letter) are matched automatically; other rows are used as country-level fallbacks.</p></div>
+<div class="mt-8 grid gap-6 xl:grid-cols-[1fr_22rem]">
+  <div class="overflow-x-auto border border-sand bg-white">
+    <table class="admin-table-responsive w-full min-w-[700px] text-left text-sm">
+      <thead class="bg-cream text-xs uppercase text-bark"><tr><th class="p-4">Zone</th><th class="p-4">Rate (CAD)</th><th class="p-4">Postal prefixes</th><th class="p-4">Estimate</th><th></th></tr></thead>
+      <tbody>
+        {% for zone in zones %}
+        <tr class="border-t border-sand">
+          <td data-label="Zone" class="p-4 font-semibold">{{ zone.name }}</td>
+          <td data-label="Rate" class="p-4">CAD ${{ "%.2f"|format(zone.rate) }}</td>
+          <td data-label="Postal prefixes" class="p-4 font-mono text-xs">{{ zone.postal_prefixes or "—" }}</td>
+          <td data-label="Estimate" class="p-4">{{ zone.delivery_days }}</td>
+          <td data-label="Actions" class="p-4"><form method="post"><button name="delete" value="{{ zone.id }}" data-confirm="Delete this shipping zone?" class="text-xs font-semibold text-error">Delete</button></form></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <div class="space-y-6">
+    <form method="post" class="h-fit border border-sand bg-white p-6">
+      <h2 class="font-display text-2xl font-semibold">Add zone</h2>
+      <label class="mt-4 grid gap-2 text-sm font-semibold">Zone name<input name="name" required placeholder="e.g. Rest of Canada, United States, Rest of World" class="min-h-11 border border-sand px-3"></label>
+      <label class="mt-4 grid gap-2 text-sm font-semibold">Delivery rate (CAD)<input name="rate" type="number" step="0.01" min="0" required class="min-h-11 border border-sand px-3"></label>
+      <label class="mt-4 grid gap-2 text-sm font-semibold">Postal prefixes (Canada only, optional)<input name="postal_prefixes" placeholder="e.g. K,L,M,N,P" class="min-h-11 border border-sand px-3"></label>
+      <p class="mt-1 text-xs text-bark">Leave blank for a country-level fallback zone named exactly "Rest of Canada", "United States" or "Rest of World".</p>
+      <label class="mt-4 grid gap-2 text-sm font-semibold">Estimated delivery<input name="delivery_days" required placeholder="e.g. 2–5 business days" class="min-h-11 border border-sand px-3"></label>
+      <button class="btn-primary mt-5 w-full">Add zone</button>
+    </form>
+    <form method="post" class="h-fit border border-sand bg-white p-6">
+      <input type="hidden" name="form_type" value="settings">
+      <h2 class="font-display text-2xl font-semibold">Delivery options</h2>
+      <label class="mt-4 flex items-center gap-3 min-h-11">
+        <input type="checkbox" name="shipping_pickup_enabled" {% if s.get('shipping_pickup_enabled') %}checked{% endif %} class="size-4 accent-ink">
+        <span class="text-sm font-semibold">Allow free local pickup at checkout</span>
+      </label>
+      <label class="mt-2 flex items-center gap-3 min-h-11">
+        <input type="checkbox" name="shipping_manual_quote_enabled" {% if s.get('shipping_manual_quote_enabled') %}checked{% endif %} class="size-4 accent-ink">
+        <span class="text-sm font-semibold">Allow manual quote for addresses outside delivery zones</span>
+      </label>
+      <p class="mt-2 text-xs text-bark">If unchecked, checkout is blocked for addresses that don't match any zone above.</p>
+      <button class="btn-primary mt-5 w-full">Save delivery options</button>
+    </form>
+  </div>
+</div>
 {% endblock %}

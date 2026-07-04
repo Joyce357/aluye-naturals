@@ -1,3 +1,105 @@
 <!doctype html>
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Aluyè Naturals | Maintenance</title><link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@600&family=Inter:wght@400;600&display=swap" rel="stylesheet"><link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}"></head>
-<body class="grid min-h-dvh place-items-center bg-bone p-6 text-ink"><main class="max-w-2xl text-center"><p class="eyebrow text-clay">Body · Mind · Soul</p><h1 class="mt-5 font-display text-6xl font-semibold">A brief ritual pause.</h1><p class="mx-auto mt-6 max-w-xl text-lg leading-8 text-bark">{{ message }}</p></main></body></html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>{{ site_name }} | We'll be right back</title>
+<meta name="robots" content="noindex,nofollow">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="icon" type="image/png" href="{{ url_for('static', filename='images/favicon.png') }}">
+<style>
+  *,*::before,*::after{box-sizing:border-box}
+  body{margin:0;min-height:100dvh;display:grid;place-items:center;background:#1a1a1a;color:#f9f6f1;font-family:'Inter',sans-serif;padding:2rem 1.25rem;opacity:0;animation:fade-in .6s ease forwards}
+  @keyframes fade-in{to{opacity:1}}
+  main{max-width:560px;width:100%;text-align:center}
+  .logo{width:64px;height:64px;border-radius:50%;object-fit:cover;margin:0 auto}
+  .tagline{margin:.9rem 0 0;font-size:.7rem;letter-spacing:.2em;text-transform:uppercase;color:#c9a978}
+  .art{width:100%;max-width:220px;margin:2.25rem auto;display:block;border-radius:12px;object-fit:cover;aspect-ratio:1/1}
+  h1{font-family:'Cormorant Garamond',serif;font-weight:600;font-size:clamp(2rem,5vw,2.75rem);line-height:1.15;margin:0 0 1rem}
+  p.sub{font-size:1rem;line-height:1.7;color:rgba(249,246,241,.75);max-width:440px;margin:0 auto 2.25rem}
+  form{display:flex;gap:.6rem;flex-wrap:wrap;justify-content:center;margin:0 auto}
+  form[hidden]{display:none}
+  input[type=email]{flex:1 1 260px;min-height:48px;border:1px solid rgba(249,246,241,.3);background:transparent;color:#f9f6f1;padding:0 1rem;font-size:.95rem}
+  input[type=email]::placeholder{color:rgba(249,246,241,.5)}
+  input[type=email]:focus{outline:none;border-color:#f9f6f1}
+  button{min-height:48px;padding:0 1.5rem;background:#f9f6f1;color:#1a1a1a;border:none;font-weight:700;font-size:.8rem;text-transform:uppercase;letter-spacing:.05em;cursor:pointer}
+  button:disabled{opacity:.6;cursor:default}
+  .form-label{font-size:.85rem;font-weight:600;margin-bottom:.75rem;color:#f9f6f1}
+  .form-msg{margin-top:.9rem;font-size:.85rem;min-height:1.2em}
+  .form-msg.error{color:#e8a2a2}
+  .form-msg.success{color:#a8d5ba}
+  .socials{display:flex;justify-content:center;gap:1rem;margin-top:2.5rem}
+  .socials a{color:rgba(249,246,241,.7);text-decoration:none;font-size:.8rem;font-weight:600;letter-spacing:.03em;border:1px solid rgba(249,246,241,.25);padding:.5rem 1rem}
+  .socials a:hover{color:#1a1a1a;background:#f9f6f1}
+  footer{margin-top:3rem;font-size:.75rem;color:rgba(249,246,241,.45)}
+  @media (max-width:480px){form{flex-direction:column}input[type=email],button{flex:none;width:100%}}
+</style>
+</head>
+<body>
+<main>
+  <img class="logo" src="{{ url_for('media', collection='products', filename='Aluye Naturals Logo.jpg') }}" alt="{{ site_name }}">
+  <p class="tagline">Body. Mind. Soul.</p>
+  <img class="art" src="{{ url_for('media', collection='hero', filename='aluye-chlorophyll-hero.webp') }}" alt="">
+  <h1>We're preparing something beautiful</h1>
+  <p class="sub">{{ message or "Aluyè Naturals is currently undergoing some improvements. We will be back very soon." }}</p>
+
+  <p class="form-label">Be the first to know</p>
+  <form id="maintenance-notify-form" novalidate>
+    <input type="email" id="maintenance-email" name="email" placeholder="Your email address" required autocomplete="email">
+    <button type="submit" id="maintenance-submit">Notify Me</button>
+  </form>
+  <p class="form-msg" id="maintenance-form-msg"></p>
+
+  <div class="socials">
+    <a href="{{ site_settings.get('instagram_url', 'https://www.instagram.com/aluye_naturals') }}" target="_blank" rel="noopener">Instagram</a>
+    <a href="{{ site_settings.get('tiktok_url', 'https://www.tiktok.com/@aluye_naturals') }}" target="_blank" rel="noopener">TikTok</a>
+  </div>
+
+  <footer>&copy; {{ current_year }} {{ site_name }}. Body. Mind. Soul.</footer>
+</main>
+<script>
+(function () {
+  var form = document.getElementById("maintenance-notify-form");
+  var msg = document.getElementById("maintenance-form-msg");
+  var btn = document.getElementById("maintenance-submit");
+  var emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  form.addEventListener("submit", function (e) {
+    e.preventDefault();
+    var email = document.getElementById("maintenance-email").value.trim();
+    if (!emailRegex.test(email)) {
+      msg.textContent = "Please enter a valid email address.";
+      msg.className = "form-msg error";
+      return;
+    }
+    btn.disabled = true;
+    btn.textContent = "Sending...";
+    fetch("/api/subscribe", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email: email, source: "maintenance" }),
+    })
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        if (data.ok) {
+          form.hidden = true;
+          msg.textContent = data.status === "already_subscribed"
+            ? "You're already on the list ✓"
+            : "You're on the list ✓ We'll notify you at launch.";
+          msg.className = "form-msg success";
+        } else {
+          throw new Error("failed");
+        }
+      })
+      .catch(function () {
+        btn.disabled = false;
+        btn.textContent = "Notify Me";
+        msg.textContent = "Something went wrong. Please try again.";
+        msg.className = "form-msg error";
+      });
+  });
+})();
+</script>
+</body>
+</html>

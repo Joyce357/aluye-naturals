@@ -61,7 +61,7 @@
       <textarea id="reply-textarea" name="reply_text" rows="5" placeholder="Write your reply to {{ msg.name }}..." class="w-full border border-sand bg-cream p-4 text-sm" style="min-height:120px">{{ draft.draft_text if draft else '' }}</textarea>
 
       <div class="space-y-1 text-xs text-bark">
-        <p><strong>From:</strong> {{ site_settings.get('contact_email', 'admin@aluyenaturals.com') if site_settings is defined else 'admin@aluyenaturals.com' }}</p>
+        <p><strong>From:</strong> {{ site_settings.get('contact_email', 'erica@aluyenaturals.com') if site_settings is defined else 'erica@aluyenaturals.com' }}</p>
         <p><strong>To:</strong> {{ msg.email }}</p>
         <p><strong>Subject:</strong> Re: {{ msg.subject }}</p>
       </div>
