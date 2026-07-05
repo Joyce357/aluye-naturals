@@ -96,15 +96,13 @@
 
           {% if paypal_client_id %}
           <div id="paypal-button-container" class="pt-1"></div>
-          <p class="text-center text-xs text-bark">or</p>
+          <p class="text-center text-xs text-bark">Pay with PayPal, credit card, debit card, or a linked bank account — all processed securely by PayPal.</p>
           {% elif is_admin %}
           <p class="border border-error bg-white p-4 text-sm font-semibold text-error">PayPal is not configured. Add a Client ID and Secret in Global Settings → Integrations to enable it here.</p>
+          {% else %}
+          <p class="border border-error bg-white p-4 text-sm font-semibold text-error">No payment method is currently available. Please contact us to complete your order.</p>
           {% endif %}
-
-          <label class="flex cursor-pointer items-center gap-3 border border-sand bg-cream p-4 has-[:checked]:border-ink">
-            <input type="radio" name="payment_method" value="bank_transfer" checked class="size-4 accent-ink">
-            <div><p class="text-sm font-semibold">Bank Transfer / Online Payment</p><p class="text-xs text-bark">Pay via bank transfer or online banking</p></div>
-          </label>
+          {% if errors.get('payment_method') %}<p class="text-sm text-error">{{ errors.payment_method }}</p>{% endif %}
         </div>
       </fieldset>
     </div>

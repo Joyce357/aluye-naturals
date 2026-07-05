@@ -5,6 +5,9 @@
   <p class="eyebrow text-success">Order confirmed</p>
   <h1 class="mx-auto mt-4 max-w-3xl font-display text-5xl font-semibold leading-none md:text-7xl">Thank you, {{ customer.first_name }}.</h1>
   <p class="mx-auto mt-6 max-w-xl text-lg leading-8 text-bark">Your order <strong>{{ order_number }}</strong> is being prepared. A confirmation will be sent to {{ customer.email }}.</p>
+  {% if payment_method %}
+  <p class="mx-auto mt-3 max-w-xl text-sm text-bark">{% if transaction_id %}Paid via {{ payment_method }} · Transaction #{{ transaction_id }}{% else %}Payment method: {{ payment_method }}{% endif %}</p>
+  {% endif %}
   <div class="mx-auto mt-10 max-w-xl border border-sand bg-cream p-6 text-left">
     <h2 class="font-display text-3xl font-semibold">Order summary</h2>
     <div class="mt-5 divide-y divide-sand">

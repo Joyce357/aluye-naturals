@@ -84,7 +84,9 @@ def test_cart_and_checkout_flow():
     assert checkout.status_code == 200
     assert b"Complete your order" in checkout.data
 
-    confirmed = client.post(
+    # PayPal is the only checkout path — submitting the plain form must never
+    # place an order, since no payment has actually been taken.
+    rejected = client.post(
         "/checkout",
         data={
             "email": "customer@example.com",
@@ -97,8 +99,95 @@ def test_cart_and_checkout_flow():
             "country": "Nigeria",
         },
     )
-    assert confirmed.status_code == 200
-    assert b"Order confirmed" in confirmed.data
+    assert rejected.status_code == 200
+    assert b"Order confirmed" not in rejected.data
+    assert b"PayPal" in rejected.data
+
+
+def test_paypal_checkout_completes_order_and_blocks_failed_capture(monkeypatch):
+    import paypal_client
+
+    database = os.path.join(tempfile.mkdtemp(), "admin.db")
+    app = create_app({"TESTING": True, "SECRET_KEY": "paypal-test", "ADMIN_DATABASE": database})
+    client = app.test_client()
+    with app.app_context():
+        from admin import save_setting
+
+        save_setting(
+            "settings",
+            {"paypal_client": "fake-client-id", "paypal_configured": True, "paypal_sandbox": True},
+        )
+    monkeypatch.setenv("PAYPAL_SECRET", "fake-secret")
+    monkeypatch.setattr(paypal_client, "_get_access_token", lambda settings: "fake-token")
+
+    client.post("/cart/add/chlorophyll-whipped-shea-butter", data={"quantity": "1"})
+    form = {
+        "email": "paypalbuyer@example.com", "first_name": "Ada", "last_name": "Stone",
+        "address": "1 Shea Lane", "apartment": "", "city": "Toronto", "postal_code": "M5H2M9",
+        "country": "Canada", "phone": "", "shipping_method": "standard",
+    }
+
+    class FakeResponse:
+        def __init__(self, payload):
+            self._payload = payload
+
+        def raise_for_status(self):
+            pass
+
+        def json(self):
+            return self._payload
+
+    monkeypatch.setattr(
+        paypal_client.requests, "post", lambda *a, **k: FakeResponse({"id": "FAKE-ORDER"})
+    )
+    created = client.post("/api/paypal/create-order", data=form)
+    assert created.status_code == 200
+    assert created.get_json()["id"] == "FAKE-ORDER"
+
+    monkeypatch.setattr(
+        paypal_client.requests, "post",
+        lambda *a, **k: FakeResponse({"status": "DECLINED"}),
+    )
+    declined = client.post("/api/paypal/capture-order/FAKE-ORDER", data=form)
+    assert declined.status_code == 400
+    assert declined.get_json()["ok"] is False
+
+    with app.app_context():
+        from admin import get_db
+
+        assert get_db().execute(
+            "SELECT 1 FROM orders WHERE email='paypalbuyer@example.com'"
+        ).fetchone() is None
+
+    monkeypatch.setattr(
+        paypal_client.requests, "post", lambda *a, **k: FakeResponse({"id": "FAKE-ORDER-2"})
+    )
+    client.post("/api/paypal/create-order", data=form)
+    monkeypatch.setattr(
+        paypal_client.requests, "post",
+        lambda *a, **k: FakeResponse({
+            "status": "COMPLETED",
+            "purchase_units": [{"payments": {"captures": [{"id": "FAKE-CAPTURE"}]}}],
+        }),
+    )
+    captured = client.post("/api/paypal/capture-order/FAKE-ORDER-2", data=form)
+    assert captured.status_code == 200
+    result = captured.get_json()
+    assert result["ok"] is True
+
+    confirmation = client.get(result["redirect"])
+    assert b"Order confirmed" in confirmation.data
+    assert b"PayPal" in confirmation.data
+
+    with app.app_context():
+        from admin import get_db
+
+        order = get_db().execute(
+            "SELECT status, payment_method, transaction_id FROM orders WHERE email='paypalbuyer@example.com'"
+        ).fetchone()
+        assert order["status"] == "Paid"
+        assert order["payment_method"] == "PayPal"
+        assert order["transaction_id"] == "FAKE-CAPTURE"
 
 
 def test_content_pages_and_catalogue_segments_render():
@@ -187,7 +276,9 @@ def test_admin_login_protection_and_sections():
         assert client.get(path).status_code == 200
 
 
-def test_contact_message_and_checkout_sync_to_admin():
+def test_contact_message_and_checkout_sync_to_admin(monkeypatch):
+    import paypal_client
+
     database = os.path.join(tempfile.mkdtemp(), "admin.db")
     app = create_app(
         {
@@ -196,6 +287,16 @@ def test_contact_message_and_checkout_sync_to_admin():
             "ADMIN_DATABASE": database,
         }
     )
+    with app.app_context():
+        from admin import save_setting
+
+        save_setting(
+            "settings",
+            {"paypal_client": "fake-client-id", "paypal_configured": True, "paypal_sandbox": True},
+        )
+    monkeypatch.setenv("PAYPAL_SECRET", "fake-secret")
+    monkeypatch.setattr(paypal_client, "_get_access_token", lambda settings: "fake-token")
+
     client = app.test_client()
     client.post(
         "/contact",
@@ -210,19 +311,41 @@ def test_contact_message_and_checkout_sync_to_admin():
         "/cart/add/chlorophyll-whipped-shea-butter",
         data={"quantity": "2", "next": "/cart"},
     )
-    client.post(
-        "/checkout",
-        data={
-            "email": "order@example.com",
-            "first_name": "Ada",
-            "last_name": "Admin",
-            "address": "1 Shea Lane",
-            "apartment": "",
-            "city": "Lagos",
-            "postal_code": "100001",
-            "country": "Nigeria",
-        },
+    order_form = {
+        "email": "order@example.com",
+        "first_name": "Ada",
+        "last_name": "Admin",
+        "address": "1 Shea Lane",
+        "apartment": "",
+        "city": "Lagos",
+        "postal_code": "100001",
+        "country": "Nigeria",
+        "shipping_method": "standard",
+    }
+
+    class FakeResponse:
+        def __init__(self, payload):
+            self._payload = payload
+
+        def raise_for_status(self):
+            pass
+
+        def json(self):
+            return self._payload
+
+    monkeypatch.setattr(
+        paypal_client.requests, "post", lambda *a, **k: FakeResponse({"id": "SYNC-ORDER"})
     )
+    client.post("/api/paypal/create-order", data=order_form)
+    monkeypatch.setattr(
+        paypal_client.requests, "post",
+        lambda *a, **k: FakeResponse({
+            "status": "COMPLETED",
+            "purchase_units": [{"payments": {"captures": [{"id": "SYNC-CAPTURE"}]}}],
+        }),
+    )
+    client.post("/api/paypal/capture-order/SYNC-ORDER", data=order_form)
+
     client.post(
         "/admin/login",
         data={"username": "admin", "password": "aluye2026"},

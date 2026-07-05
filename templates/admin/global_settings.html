@@ -261,11 +261,15 @@
   <form method="post" data-settings-panel="integrations" hidden class="space-y-5">
     <input type="hidden" name="tab" value="integrations">
     <h3 class="font-display text-2xl font-semibold">Payment Gateways</h3>
+    <p class="text-xs text-bark">PayPal is the only checkout method — there is no manual/offline payment option. Every order is paid and automatically deposited into the PayPal Business account configured below before it is created.</p>
     {% for provider, fields in [("Stripe", [("stripe_publishable", "Publishable key"), ("stripe_secret", "Secret key")]), ("PayPal", [("paypal_client", "Client ID"), ("paypal_secret", "Secret")]), ("Flutterwave", [("flutterwave_public", "Public key"), ("flutterwave_secret", "Secret key")]), ("Paystack", [("paystack_public", "Public key"), ("paystack_secret", "Secret key")])] %}
     <div class="border border-sand bg-white p-4">
       <p class="font-semibold">{{ provider }} {% if s.get(provider|lower ~ '_configured') %}<span class="text-xs text-success">✓ Connected</span>{% else %}<span class="text-xs text-bark">Not configured</span>{% endif %}</p>
       {% if provider == "PayPal" and not s.get('paypal_configured') %}
       <p class="mt-2 border border-error bg-white px-3 py-2 text-xs font-semibold text-error">PayPal is not configured. Add a Client ID and Secret below to enable PayPal at checkout.</p>
+      {% endif %}
+      {% if provider != "PayPal" %}
+      <p class="mt-2 border border-sand bg-cream px-3 py-2 text-xs text-bark">{{ provider }} checkout is not yet built — saving keys here stores them for later but does not process payments. PayPal is the only gateway currently live at checkout.</p>
       {% endif %}
       {% for field, label in fields %}
       <div class="mt-3">

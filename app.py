@@ -85,6 +85,9 @@ def create_app(test_config=None):
         MAIL_PASSWORD=os.environ.get("MAIL_PASSWORD", ""),
         MAIL_DEFAULT_SENDER=mail_user or "noreply@aluyenaturals.com",
         MAIL_SUPPRESS_SEND=not mail_user,
+        SESSION_COOKIE_SECURE=os.environ.get("FLASK_ENV") == "production",
+        SESSION_COOKIE_HTTPONLY=True,
+        SESSION_COOKIE_SAMESITE="Lax",
     )
     if test_config:
         app.config.update(test_config)
@@ -841,6 +844,9 @@ def create_app(test_config=None):
         shipping_quote = quote_shipping(preview_form, shipping_method, subtotal) if request.method == "GET" else None
 
         if request.method == "POST":
+            # PayPal is the only checkout path — a plain form submit can never place
+            # an order. Real orders are only ever created by paypal_capture_order_route
+            # after PayPal confirms the payment.
             form = {key: request.form.get(key, "").strip() for key in CHECKOUT_FIELDS}
             errors = validate_checkout_form(form)
             shipping_quote = quote_shipping(form, shipping_method, subtotal)
@@ -849,25 +855,7 @@ def create_app(test_config=None):
                     errors["postal_code"] = "We don't have automatic delivery pricing for this address — we'll follow up with a manual shipping quote."
                 else:
                     errors["postal_code"] = "Sorry, we don't currently deliver to this address."
-            if not errors:
-                order_number, shipping_fee = place_order(
-                    form, items, subtotal, shipping_quote, payment_method="Bank Transfer / Online Payment"
-                )
-                return render_template(
-                    "confirmation.html",
-                    order_number=order_number,
-                    customer=form,
-                    items=items,
-                    subtotal=subtotal,
-                    delivery=shipping_fee,
-                    total=subtotal + shipping_fee,
-                    seo=page_seo(
-                        "Order Confirmed | Aluyè Naturals",
-                        "Your Aluyè Naturals order is confirmed.",
-                        "/checkout",
-                        robots="noindex,nofollow",
-                    ),
-                )
+            errors["payment_method"] = "Please complete payment using the PayPal button above to place your order."
         delivery = shipping_quote["rate"] or 0 if shipping_quote and shipping_quote["available"] else 0
         return render_template(
             "checkout.html",
@@ -917,7 +905,7 @@ def create_app(test_config=None):
         form = {key: request.form.get(key, "").strip() for key in CHECKOUT_FIELDS}
         errors = validate_checkout_form(form)
         shipping_method = request.form.get("shipping_method", "standard")
-        quote = quote_shipping(form, shipping_method)
+        quote = quote_shipping(form, shipping_method, subtotal)
         if not quote["available"]:
             return {"error": "We don't currently deliver to this address."}, 400
         if errors:
@@ -929,6 +917,19 @@ def create_app(test_config=None):
         except Exception as exc:
             print(f"PayPal create-order error: {exc}")
             return {"error": "Could not start PayPal checkout. Please try again."}, 502
+
+        # Snapshot exactly what PayPal was told the price is, so a cart change
+        # between create-order and capture can never desync the charged amount
+        # from the recorded order (price-tamper / race-condition protection).
+        session[f"paypal_snapshot_{order['id']}"] = {
+            "items": [
+                {"slug": item["product"]["slug"], "quantity": item["quantity"], "line_total": item["line_total"]}
+                for item in items
+            ],
+            "subtotal": subtotal,
+            "quote": quote,
+            "form": form,
+        }
         return {"id": order["id"]}
 
     @app.post("/api/paypal/capture-order/<paypal_order_id>")
@@ -939,19 +940,9 @@ def create_app(test_config=None):
         if not paypal_client.is_configured(settings):
             return {"ok": False, "error": "PayPal is not configured."}, 400
 
-        items, subtotal = cart_summary()
-        if not items:
-            return {"ok": False, "error": "Your bag is empty."}, 400
-
-        form = {key: request.form.get(key, "").strip() for key in CHECKOUT_FIELDS}
-        errors = validate_checkout_form(form)
-        if errors:
-            return {"ok": False, "error": "Please complete all required fields."}, 400
-
-        shipping_method = request.form.get("shipping_method", "standard")
-        quote = quote_shipping(form, shipping_method)
-        if not quote["available"]:
-            return {"ok": False, "error": "We don't currently deliver to this address."}, 400
+        snapshot = session.pop(f"paypal_snapshot_{paypal_order_id}", None)
+        if not snapshot:
+            return {"ok": False, "error": "Your checkout session expired. Please try again."}, 400
 
         try:
             capture = paypal_client.capture_order(settings, paypal_order_id)
@@ -962,9 +953,17 @@ def create_app(test_config=None):
         if capture.get("status") != "COMPLETED":
             return {"ok": False, "error": "PayPal payment was not completed."}, 400
 
+        items = [
+            {
+                "product": next((p for p in PRODUCTS if p["slug"] == entry["slug"]), {"slug": entry["slug"], "name": entry["slug"], "image": ""}),
+                "quantity": entry["quantity"],
+                "line_total": entry["line_total"],
+            }
+            for entry in snapshot["items"]
+        ]
         transaction_id = paypal_client.extract_capture_id(capture)
         order_number, shipping_fee = place_order(
-            form, items, subtotal, quote,
+            snapshot["form"], items, snapshot["subtotal"], snapshot["quote"],
             payment_method="PayPal", status="Paid", transaction_id=transaction_id,
         )
         return {"ok": True, "redirect": url_for("checkout_confirmation", order_number=order_number)}
@@ -982,10 +981,19 @@ def create_app(test_config=None):
             "confirmation.html",
             order_number=order["order_number"],
             customer={"first_name": order["customer_name"].split(" ")[0], "email": order["email"]},
-            items=json.loads(order["items"]),
+            items=[
+                {
+                    "product": {"name": item["name"], "slug": item.get("slug", "")},
+                    "quantity": item["quantity"],
+                    "line_total": item["total"],
+                }
+                for item in json.loads(order["items"])
+            ],
             subtotal=order["total"] - order["shipping_fee"],
             delivery=order["shipping_fee"],
             total=order["total"],
+            payment_method=order["payment_method"],
+            transaction_id=order["transaction_id"],
             seo=page_seo(
                 "Order Confirmed | Aluyè Naturals",
                 "Your Aluyè Naturals order is confirmed.",

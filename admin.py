@@ -790,7 +790,7 @@ def save_order(
     items,
     subtotal,
     shipping_fee=0,
-    payment_method="Bank Transfer / Online Payment",
+    payment_method="PayPal",
     status="Pending",
     transaction_id="",
 ):
