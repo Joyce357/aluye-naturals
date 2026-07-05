@@ -163,7 +163,6 @@ def create_app(test_config=None):
         category_images = {
             "Skin Care": "photo_2_2026-06-08_18-19-49.webp",
             "Oil": "photo_2026-06-09_11-04-11.webp",
-            "Men": "photo_7_2026-06-08_18-19-49.webp",
             "Hair": "photo_4_2026-06-05_22-40-06.webp",
             "Beards": "photo_2026-06-09_11-04-16.webp",
             "African Black Soap": "photo_2026-06-09_11-04-04.webp",
@@ -470,9 +469,9 @@ def create_app(test_config=None):
                 "Natural Oil | Aluyè Naturals",
                 "Cold-pressed botanical face and body oils — rosehip, black seed, coconut and more. No additives, pure and natural. Aluyè Naturals.",
             ),
-            "Men": (
-                "Natural Men | Aluyè Naturals",
-                "Natural men's grooming — beard wash, beard oil and beard balm made with African black soap and shea butter. Shop Aluyè Naturals men's range.",
+            "Beards": (
+                "Beard Care | Aluyè Naturals",
+                "Discover premium natural beard oils and grooming essentials designed to nourish, soften, and maintain a healthy beard.",
             ),
         }
         shop_title, shop_description = category_meta.get(

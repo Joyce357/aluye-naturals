@@ -151,7 +151,7 @@
               <div>
                 <p class="text-xs font-bold uppercase tracking-wider">Shop by category</p>
                 <div class="mt-4 grid gap-3 text-sm">
-                  {% for category in ["Skin Care", "Oil", "Men", "Hair", "Beards", "African Black Soap"] %}
+                  {% for category in ["Skin Care", "Oil", "Hair", "Beards", "African Black Soap"] %}
                     <a href="{{ url_for('shop', category=category) }}" class="hover:underline">{{ category }}</a>
                   {% endfor %}
                 </div>
@@ -164,8 +164,8 @@
                   <a href="{{ url_for('shop', q='gift') }}" class="hover:underline">Gifts & sets</a>
                 </div>
               </div>
-              <a href="{{ url_for('shop', category='Men') }}" class="bg-ink p-6 text-white">
-                <p class="eyebrow text-shea">Men’s grooming</p>
+              <a href="{{ url_for('shop', category='Beards') }}" class="bg-ink p-6 text-white">
+                <p class="eyebrow text-shea">Beard care</p>
                 <p class="mt-4 font-display text-3xl font-semibold">The complete beard ritual.</p>
                 <span class="mt-6 inline-flex items-center gap-2 text-sm font-semibold">Shop now {{ icon("arrow", "size-4") }}</span>
               </a>
@@ -176,7 +176,7 @@
         <a href="{{ url_for('contact') }}" class="nav-link">Contact</a>
         <a href="{{ url_for('shop', category='Skin Care') }}" class="nav-link">Skin Care</a>
         <a href="{{ url_for('shop', category='Oil') }}" class="nav-link">Oils</a>
-        <a href="{{ url_for('shop', category='Men') }}" class="nav-link">Men</a>
+        <a href="{{ url_for('shop', category='Beards') }}" class="nav-link">Beards</a>
         <a href="{{ url_for('shop', category='African Black Soap') }}" class="nav-link">Black Soap</a>
       </div>
     </nav>
@@ -206,7 +206,7 @@
           <a href="{{ url_for(endpoint) }}" class="flex min-h-14 items-center justify-between border-b border-neutral-200 text-lg font-semibold">{{ label }} {{ icon("arrow") }}</a>
         {% endfor %}
         <p class="eyebrow mt-8 text-neutral-500">Shop by category</p>
-        {% for category in ["Skin Care", "Oil", "Men", "Hair", "Beards", "African Black Soap"] %}
+        {% for category in ["Skin Care", "Oil", "Hair", "Beards", "African Black Soap"] %}
           <a href="{{ url_for('shop', category=category) }}" class="flex min-h-12 items-center border-b border-neutral-100 text-sm font-semibold">{{ category }}</a>
         {% endfor %}
       </nav>
@@ -252,7 +252,7 @@
       </div>
       <details class="footer-accordion">
         <summary>Shop</summary>
-        <div class="footer-links"><h3 class="hidden text-xs font-bold uppercase tracking-wider md:block">Shop</h3><ul class="space-y-3 text-sm text-white/70 md:mt-5">{% for item in ["Skin Care", "Oil", "Men", "Hair", "Beards", "African Black Soap"] %}<li><a href="{{ url_for('shop', category=item) }}" class="inline-block min-h-[44px] leading-[44px] hover:text-white">{{ item }}</a></li>{% endfor %}</ul></div>
+        <div class="footer-links"><h3 class="hidden text-xs font-bold uppercase tracking-wider md:block">Shop</h3><ul class="space-y-3 text-sm text-white/70 md:mt-5">{% for item in ["Skin Care", "Oil", "Hair", "Beards", "African Black Soap"] %}<li><a href="{{ url_for('shop', category=item) }}" class="inline-block min-h-[44px] leading-[44px] hover:text-white">{{ item }}</a></li>{% endfor %}</ul></div>
       </details>
       <details class="footer-accordion">
         <summary>About Aluyè</summary>

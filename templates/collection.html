@@ -67,6 +67,12 @@
         <p class="mx-auto mt-4 max-w-md text-bark">Try another price range or product tag.</p>
         <button type="button" data-clear-filters class="btn-primary mt-7">Clear filters</button>
       </div>
+    {% elif active_category == "Beards" %}
+      <div class="my-20 border border-sand bg-cream px-6 py-16 text-center">
+        <h2 class="font-display text-4xl font-semibold">Our Beard Care Collection is Coming Soon</h2>
+        <p class="mx-auto mt-4 max-w-md text-bark">Stay tuned for premium beard oils and grooming essentials.</p>
+        <a href="{{ url_for('shop') }}" class="btn-primary mt-7">View all products</a>
+      </div>
     {% else %}
       <div class="my-20 border border-sand bg-cream px-6 py-16 text-center">
         <h2 class="font-display text-4xl font-semibold">No rituals found</h2>

@@ -227,7 +227,7 @@ PRODUCTS = [
     {
         "slug": "gentlemens-beard-wash",
         "name": "Gentlemen’s Beard Wash",
-        "segment": "Men",
+        "segment": "Beards",
         "category": "Beard Cleanser",
         "benefit": "Cleanses beard and skin with African black soap.",
         "price": 23,
@@ -242,7 +242,7 @@ PRODUCTS = [
     {
         "slug": "gentlemens-beard-care-set",
         "name": "Gentlemen’s Complete Beard Care Set",
-        "segment": "Men",
+        "segment": "Beards",
         "category": "Grooming Set",
         "benefit": "A complete cleanse, condition and style routine in one set.",
         "price": 75,
@@ -256,7 +256,7 @@ PRODUCTS = [
     },
 ]
 
-CATEGORIES = ["Skin Care", "Oil", "Men", "Hair", "Beards", "African Black Soap"]
+CATEGORIES = ["Skin Care", "Oil", "Hair", "Beards", "African Black Soap"]
 
 HERO_SLIDES = [
     {
@@ -280,8 +280,8 @@ HERO_SLIDES = [
         "eyebrow": "Gentlemen’s ritual",
         "title": "Beard care rooted in natural ingredients.",
         "copy": "Cleanse, condition and style with shea, black soap and botanical oils.",
-        "label": "Shop men",
-        "category": "Men",
+        "label": "Shop beard care",
+        "category": "Beards",
     },
     {
         "image": "aluye-oil-hero.webp",

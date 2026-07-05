@@ -100,7 +100,7 @@
       recommended.push(...products.filter(p => p.segment === "Hair").slice(0, 1));
     }
     if (answers.beard && answers.beard.startsWith("Yes")) {
-      recommended.push(...products.filter(p => p.segment === "Beards" || p.segment === "Men").slice(0, 1));
+      recommended.push(...products.filter(p => p.segment === "Beards").slice(0, 1));
     }
     recommended.push(...products.filter(p => p.category === "Cleanser").slice(0, 1));
     const seen = new Set();

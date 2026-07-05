@@ -109,9 +109,9 @@ def test_content_pages_and_catalogue_segments_render():
         response = client.get(path)
         assert response.status_code == 200
 
-    men = client.get("/shop?category=Men")
+    beards = client.get("/shop?category=Beards")
     black_soap = client.get("/shop?category=African+Black+Soap")
-    assert b"Gentlemen" in men.data
+    assert b"Gentlemen" in beards.data
     assert b"Organic African Black Soap" in black_soap.data
 
 
@@ -325,8 +325,7 @@ def test_homepage_editor_reorders_and_hides_categories():
             "journal": "on",
             "signup_heading": "Join",
             "signup_subheading": "News",
-            "category_order": "Men,Oil,Skin Care,Hair,Beards,African Black Soap",
-            "category_men": "on",
+            "category_order": "Beards,Oil,Skin Care,Hair,African Black Soap",
             "category_oil": "on",
             "category_skin_care": "on",
             "category_hair": "on",
@@ -336,5 +335,5 @@ def test_homepage_editor_reorders_and_hides_categories():
     home = client.get("/").get_data(as_text=True)
     assert "Edited hero" in home
     category_section = home.split("Shop Aluyè", 1)[1].split("New This Season", 1)[0]
-    assert category_section.find(">Men<") < category_section.find(">Oil<")
+    assert category_section.find(">Beards<") < category_section.find(">Oil<")
     assert ">African Black Soap<" not in category_section
