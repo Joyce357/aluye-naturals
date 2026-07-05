@@ -25,7 +25,6 @@
       ("store_name", "Store name", "text"),
       ("tagline", "Store tagline", "text"),
       ("admin_email", "Admin email", "email"),
-      ("base_currency", "Default currency", "text"),
       ("region", "Region / Country", "text"),
       ("timezone", "Timezone", "text"),
     ] %}
@@ -34,6 +33,15 @@
       <input name="{{ field }}" type="{{ type }}" value="{{ s.get(field, defaults.get(field, '')) }}" class="mt-1 min-h-12 w-full border border-sand bg-cream px-4">
     </div>
     {% endfor %}
+    <div>
+      <label class="text-sm font-semibold">Default currency</label>
+      <select name="base_currency" class="mt-1 min-h-12 w-full border border-sand bg-cream px-4">
+        {% for code, label in [("CAD", "Canada / CAD"), ("USD", "United States / USD"), ("GBP", "United Kingdom / GBP"), ("NGN", "Nigeria / NGN")] %}
+        <option value="{{ code }}" {% if s.get('base_currency', 'CAD') == code %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+      <p class="mt-1 text-xs text-bark">Display currency shown to new visitors before they choose one. All payments are always processed in CAD regardless of this setting.</p>
+    </div>
     <div>
       <label class="text-sm font-semibold">Store status</label>
       <select name="store_status" class="mt-1 min-h-12 w-full border border-sand bg-cream px-4">
@@ -187,6 +195,54 @@
       <textarea name="welcome_email_body" rows="6" class="mt-1 w-full border border-sand bg-cream p-4">{{ s.get('welcome_email_body', '') }}</textarea>
     </div>
     <button class="btn-primary">Save Newsletter</button>
+  </form>
+
+  {# Tab: Automated Messages #}
+  <form method="post" data-settings-panel="messages" hidden class="space-y-8">
+    <input type="hidden" name="tab" value="messages">
+
+    <div class="space-y-4 border-b border-sand pb-8">
+      <h3 class="font-display text-xl font-semibold">Order shipped</h3>
+      <label class="flex items-center gap-3 min-h-11">
+        <input type="checkbox" name="shipped_email_enabled" {% if s.get('shipped_email_enabled', True) %}checked{% endif %} class="size-4 accent-ink">
+        <span class="text-sm font-semibold">Send email when order is marked Shipped</span>
+      </label>
+      <div><label class="text-sm font-semibold">Subject</label><input name="shipped_email_subject" value="{{ s.get('shipped_email_subject', '') }}" class="mt-1 min-h-12 w-full border border-sand bg-cream px-4"></div>
+      <div><label class="text-sm font-semibold">Message</label><textarea name="shipped_email_message" rows="3" class="mt-1 w-full border border-sand bg-cream p-4">{{ s.get('shipped_email_message', '') }}</textarea></div>
+    </div>
+
+    <div class="space-y-4 border-b border-sand pb-8">
+      <h3 class="font-display text-xl font-semibold">Order delivered</h3>
+      <label class="flex items-center gap-3 min-h-11">
+        <input type="checkbox" name="delivered_email_enabled" {% if s.get('delivered_email_enabled', True) %}checked{% endif %} class="size-4 accent-ink">
+        <span class="text-sm font-semibold">Send email when order is marked Delivered</span>
+      </label>
+      <div><label class="text-sm font-semibold">Subject</label><input name="delivered_email_subject" value="{{ s.get('delivered_email_subject', '') }}" class="mt-1 min-h-12 w-full border border-sand bg-cream px-4"></div>
+      <div><label class="text-sm font-semibold">Message</label><textarea name="delivered_email_message" rows="3" class="mt-1 w-full border border-sand bg-cream p-4">{{ s.get('delivered_email_message', '') }}</textarea></div>
+    </div>
+
+    <div class="space-y-4 border-b border-sand pb-8">
+      <h3 class="font-display text-xl font-semibold">Customer inquiry auto-response</h3>
+      <label class="flex items-center gap-3 min-h-11">
+        <input type="checkbox" name="inquiry_autoresponse_enabled" {% if s.get('inquiry_autoresponse_enabled', True) %}checked{% endif %} class="size-4 accent-ink">
+        <span class="text-sm font-semibold">Send automatic acknowledgement when a customer submits the contact form</span>
+      </label>
+      <div><label class="text-sm font-semibold">Subject</label><input name="inquiry_autoresponse_subject" value="{{ s.get('inquiry_autoresponse_subject', '') }}" class="mt-1 min-h-12 w-full border border-sand bg-cream px-4"></div>
+      <div><label class="text-sm font-semibold">Message</label><textarea name="inquiry_autoresponse_message" rows="3" class="mt-1 w-full border border-sand bg-cream p-4">{{ s.get('inquiry_autoresponse_message', '') }}</textarea></div>
+    </div>
+
+    <div class="space-y-4">
+      <h3 class="font-display text-xl font-semibold">Abandoned cart reminder</h3>
+      <label class="flex items-center gap-3 min-h-11">
+        <input type="checkbox" name="abandoned_cart_enabled" {% if s.get('abandoned_cart_enabled') %}checked{% endif %} class="size-4 accent-ink">
+        <span class="text-sm font-semibold">Automatically email customers who leave items in their cart</span>
+      </label>
+      <div><label class="text-sm font-semibold">Send reminder after (hours)</label><input name="abandoned_cart_delay_hours" value="{{ s.get('abandoned_cart_delay_hours', '24') }}" class="mt-1 min-h-12 w-full border border-sand bg-cream px-4"></div>
+      <div><label class="text-sm font-semibold">Subject</label><input name="abandoned_cart_subject" value="{{ s.get('abandoned_cart_subject', '') }}" class="mt-1 min-h-12 w-full border border-sand bg-cream px-4"></div>
+      <div><label class="text-sm font-semibold">Message</label><textarea name="abandoned_cart_message" rows="3" class="mt-1 w-full border border-sand bg-cream p-4">{{ s.get('abandoned_cart_message', '') }}</textarea></div>
+    </div>
+
+    <button class="btn-primary">Save Automated Messages</button>
   </form>
 
   {# Tab 9: Footer #}

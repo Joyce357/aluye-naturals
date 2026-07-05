@@ -16,6 +16,9 @@
 
       <p style="color:#594a3b;line-height:1.7;margin:0 0 16px;font-size:15px;">Thank you for joining the Aluyè Naturals community. You are now part of a growing family that believes everyday care should be intentional, natural and deeply rooted in heritage.</p>
       <p style="color:#594a3b;line-height:1.7;margin:0 0 28px;font-size:15px;">We create small-batch skincare, hair care and body care using unrefined West African botanical ingredients — kept as close to nature as possible, because that is where the real power is.</p>
+      {% if custom_message %}
+      <p style="color:#594a3b;line-height:1.7;margin:0 0 28px;font-size:15px;">{{ custom_message }}</p>
+      {% endif %}
 
       <!-- Discount box -->
       <div style="border:1px solid #e7d8c3;background:#fff;padding:24px;text-align:center;margin:0 0 28px;">

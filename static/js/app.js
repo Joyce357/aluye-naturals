@@ -26,7 +26,7 @@ const currencyOptions = {
 };
 
 function getCurrency() {
-  return localStorage.getItem("aluye-currency") || "CAD";
+  return localStorage.getItem("aluye-currency") || window.ALUYE_BASE_CURRENCY || "CAD";
 }
 
 function formatMoney(amount, code) {
@@ -110,6 +110,20 @@ document.querySelectorAll("[data-currency-selector]").forEach((selector) => {
   });
 });
 updateCurrency();
+
+/* First-time visitors only: suggest a currency based on their location.
+   Never overrides a currency the visitor already picked. */
+if (!localStorage.getItem("aluye-currency")) {
+  fetch("/api/geo-currency")
+    .then((r) => r.json())
+    .then((data) => {
+      if (data.currency && currencyOptions[data.currency] && !localStorage.getItem("aluye-currency")) {
+        localStorage.setItem("aluye-currency", data.currency);
+        updateCurrency();
+      }
+    })
+    .catch(() => {});
+}
 
 /* ── Toast ── */
 function showToast(message, duration = 2500) {
@@ -416,13 +430,61 @@ document.addEventListener("click", () => {
 /* ── Newsletter ── */
 document
   .querySelector("#newsletter-form")
-  ?.addEventListener("submit", (event) => {
+  ?.addEventListener("submit", async (event) => {
     event.preventDefault();
+    const form = event.currentTarget;
+    const emailInput = document.querySelector("#newsletter-email");
     const status = document.querySelector("#newsletter-status");
-    if (status)
-      status.textContent =
-        "Thank you. Your ritual notes are on their way.";
-    event.currentTarget.reset();
+    const button = form.querySelector("button");
+    const email = emailInput.value.trim();
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+    if (!status) return;
+    if (!emailRegex.test(email)) {
+      status.textContent = "Please enter a valid email address.";
+      status.classList.remove("text-shea");
+      status.classList.add("text-error");
+      return;
+    }
+    status.classList.remove("text-error");
+    status.textContent = "";
+    const originalLabel = button.textContent;
+    button.disabled = true;
+    button.textContent = "Signing up...";
+
+    try {
+      const response = await fetch("/api/subscribe", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: email, source: "footer" }),
+      });
+      const data = await response.json();
+      button.disabled = false;
+      button.textContent = originalLabel;
+      if (data.ok) {
+        localStorage.setItem("aluye_subscribed", "true");
+        status.classList.remove("text-error");
+        status.classList.add("text-shea");
+        status.textContent =
+          data.status === "already_subscribed"
+            ? "You're already on the list ✓"
+            : "Thank you. Your ritual notes are on their way ✓";
+        form.reset();
+      } else {
+        status.classList.remove("text-shea");
+        status.classList.add("text-error");
+        status.textContent =
+          data.status === "invalid_email"
+            ? "Please enter a valid email address."
+            : "Something went wrong. Please try again.";
+      }
+    } catch (error) {
+      button.disabled = false;
+      button.textContent = originalLabel;
+      status.classList.remove("text-shea");
+      status.classList.add("text-error");
+      status.textContent = "Connection error. Please try again.";
+    }
   });
 
 /* ── Quick View Modal ── */

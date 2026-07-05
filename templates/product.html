@@ -178,6 +178,7 @@
 </div>
 
 <script>
+document.addEventListener("DOMContentLoaded", function () {
   trackRecentlyViewed("{{ product.slug }}");
   (function() {
     const items = getRecentlyViewed("{{ product.slug }}");
@@ -207,5 +208,6 @@
         }
       });
   })();
+});
 </script>
 {% endblock %}

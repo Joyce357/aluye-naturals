@@ -88,9 +88,7 @@
           {# Core items — no group heading #}
           {% if not group_label %}
             {% for key, label in group_items %}
-              {% if key == "payments" %}{% set href = url_for('admin.configurable_section', section=key) %}
-              {% else %}{% set href = url_for('admin.' + key) %}{% endif %}
-              <a href="{{ href }}" class="flex min-h-10 items-center justify-between rounded px-4 text-sm transition {% if admin_section == key %}bg-white/10 text-white font-semibold{% else %}text-white/60 hover:bg-white/5 hover:text-white{% endif %}">
+              <a href="{{ url_for('admin.' + key) }}" class="flex min-h-10 items-center justify-between rounded px-4 text-sm transition {% if admin_section == key %}bg-white/10 text-white font-semibold{% else %}text-white/60 hover:bg-white/5 hover:text-white{% endif %}">
                 {{ label }}
               </a>
             {% endfor %}
@@ -103,9 +101,7 @@
               <summary class="flex min-h-9 items-center rounded px-4 text-[0.65rem] font-bold uppercase tracking-[0.12em] text-white/40 hover:text-white/60">{{ group_label }}</summary>
               <div class="ml-2 mt-1 space-y-0.5 border-l border-white/10 pl-2">
                 {% for key, label in group_items %}
-                  {% if key == "payments" %}{% set href = url_for('admin.configurable_section', section=key) %}
-                  {% else %}{% set href = url_for('admin.' + key) %}{% endif %}
-                  <a href="{{ href }}" class="flex min-h-9 items-center justify-between rounded px-3 text-sm transition {% if admin_section == key %}bg-white/10 text-white font-semibold{% else %}text-white/55 hover:bg-white/5 hover:text-white{% endif %}">
+                  <a href="{{ url_for('admin.' + key) }}" class="flex min-h-9 items-center justify-between rounded px-3 text-sm transition {% if admin_section == key %}bg-white/10 text-white font-semibold{% else %}text-white/55 hover:bg-white/5 hover:text-white{% endif %}">
                     {{ label }}
                     {% if key == "messages" and admin_unread_messages %}<span class="rounded-full bg-clay px-2 py-0.5 text-[0.6rem] font-bold">{{ admin_unread_messages }}</span>{% endif %}
                     {% if key == "notifications" and admin_unread_notifications %}<span class="rounded-full bg-clay px-2 py-0.5 text-[0.6rem] font-bold">{{ admin_unread_notifications }}</span>{% endif %}
@@ -197,9 +193,7 @@
         {% if group_label %}
           <p class="mt-4 mb-2 px-3 text-[0.6rem] font-bold uppercase tracking-[0.12em] text-white/30">{{ group_label }}</p>
           {% for key, label in group_items %}
-            {% if key == "payments" %}{% set href = url_for('admin.configurable_section', section=key) %}
-            {% else %}{% set href = url_for('admin.' + key) %}{% endif %}
-            <a href="{{ href }}" class="flex min-h-11 items-center border-b border-white/5 px-3 text-sm {% if admin_section == key %}text-white font-semibold{% else %}text-white/55{% endif %}">{{ label }}</a>
+            <a href="{{ url_for('admin.' + key) }}" class="flex min-h-11 items-center border-b border-white/5 px-3 text-sm {% if admin_section == key %}text-white font-semibold{% else %}text-white/55{% endif %}">{{ label }}</a>
           {% endfor %}
         {% endif %}
       {% endfor %}

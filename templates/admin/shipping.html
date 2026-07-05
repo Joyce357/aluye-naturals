@@ -41,6 +41,31 @@
       <p class="mt-2 text-xs text-bark">If unchecked, checkout is blocked for addresses that don't match any zone above.</p>
       <button class="btn-primary mt-5 w-full">Save delivery options</button>
     </form>
+
+    <form method="post" class="h-fit border border-sand bg-white p-6">
+      <input type="hidden" name="form_type" value="distance">
+      <h2 class="font-display text-2xl font-semibold">Distance-based delivery (Google Maps)</h2>
+      {% if s.get('google_maps_configured') %}
+      <p class="mt-2 text-xs font-semibold text-success">✓ Google Maps API key connected</p>
+      {% else %}
+      <p class="mt-2 border border-error bg-white px-3 py-2 text-xs font-semibold text-error">Google Maps is not configured. Add an API key below to enable automatic distance-based delivery pricing. Until then, the zone-based pricing on the left is used.</p>
+      {% endif %}
+      <label class="mt-4 flex items-center gap-3 min-h-11">
+        <input type="checkbox" name="distance_shipping_enabled" {% if s.get('distance_shipping_enabled') %}checked{% endif %} class="size-4 accent-ink">
+        <span class="text-sm font-semibold">Use distance-based delivery pricing (falls back to zones above if unavailable)</span>
+      </label>
+      <label class="mt-4 grid gap-2 text-sm font-semibold">Google Maps API key<input name="google_maps_key" type="password" placeholder="{% if s.get('google_maps_configured') %}•••••••• (saved — leave blank to keep){% else %}Paste your Google Maps API key{% endif %}" class="min-h-11 border border-sand px-3"></label>
+      <label class="mt-4 grid gap-2 text-sm font-semibold">Store origin address<input name="shipping_origin_address" value="{{ s.get('shipping_origin_address', 'Toronto, Ontario, Canada') }}" class="min-h-11 border border-sand px-3"></label>
+      <label class="mt-4 grid gap-2 text-sm font-semibold">Base delivery fee (CAD)<input name="shipping_base_fee" type="number" step="0.01" min="0" value="{{ s.get('shipping_base_fee', '0') }}" class="min-h-11 border border-sand px-3"></label>
+      <label class="mt-4 grid gap-2 text-sm font-semibold">Cost per km (CAD)<input name="shipping_per_km_rate" type="number" step="0.01" min="0" value="{{ s.get('shipping_per_km_rate', '0') }}" class="min-h-11 border border-sand px-3"></label>
+      <label class="mt-4 grid gap-2 text-sm font-semibold">Maximum delivery distance (km, 0 = no limit)<input name="shipping_max_distance_km" type="number" step="1" min="0" value="{{ s.get('shipping_max_distance_km', '0') }}" class="min-h-11 border border-sand px-3"></label>
+      <label class="mt-4 flex items-center gap-3 min-h-11">
+        <input type="checkbox" name="shipping_free_delivery_enabled" {% if s.get('shipping_free_delivery_enabled') %}checked{% endif %} class="size-4 accent-ink">
+        <span class="text-sm font-semibold">Enable free delivery over a minimum order amount</span>
+      </label>
+      <label class="mt-4 grid gap-2 text-sm font-semibold">Free delivery minimum order (CAD)<input name="shipping_free_delivery_minimum" type="number" step="0.01" min="0" value="{{ s.get('shipping_free_delivery_minimum', '0') }}" class="min-h-11 border border-sand px-3"></label>
+      <button class="btn-primary mt-5 w-full">Save distance-based shipping</button>
+    </form>
   </div>
 </div>
 {% endblock %}

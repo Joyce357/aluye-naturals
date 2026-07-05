@@ -51,7 +51,8 @@
       .footer-accordion summary{display:none}
     }
   </style>
-  <script src="{{ url_for('static', filename='js/app.js') }}?v=9" defer></script>
+  <script>window.ALUYE_BASE_CURRENCY = {{ (site_settings.get('base_currency') or 'CAD')|tojson }};</script>
+  <script src="{{ url_for('static', filename='js/app.js') }}?v=10" defer></script>
   {% if site_settings.get('google_analytics_id') %}
   <script async src="https://www.googletagmanager.com/gtag/js?id={{ site_settings.google_analytics_id }}"></script>
   <script>
@@ -238,7 +239,7 @@
           <input id="newsletter-email" type="email" required autocomplete="email" class="min-h-12 min-w-0 flex-1 bg-transparent text-base text-white placeholder:text-white/50" placeholder="Email address">
           <button class="min-h-12 px-5 text-sm font-bold uppercase tracking-wider">Sign up</button>
         </form>
-        <p id="newsletter-status" aria-live="polite" class="text-sm text-shea md:col-start-2"></p>
+        <p id="newsletter-status" aria-live="polite" class="text-sm md:col-start-2"></p>
       </div>
     </div>
     <div class="page-shell grid gap-10 py-12 sm:grid-cols-2 lg:grid-cols-5">

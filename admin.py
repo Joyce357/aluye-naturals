@@ -41,7 +41,6 @@ NAV_GROUPS = [
         ("abandoned_admin", "Abandoned Carts"),
         ("discounts", "Discount Codes"),
         ("shipping", "Shipping & Delivery"),
-        ("payments", "Payment Methods"),
     ]),
     ("marketing", "Marketing", [
         ("subscribers_admin", "Subscribers"),
@@ -85,7 +84,7 @@ SITE_ISSUES = [
     {"priority": "Low", "title": "Some admin sidebar links leading to placeholder pages", "status": "not_reproducible"},
     {"priority": "Low", "title": "Missing OG image for social sharing", "status": "not_reproducible"},
     {"priority": "Low", "title": "Product photos are a mix of JPG/PNG and WebP — could standardize on WebP for smaller file size", "status": "open"},
-    {"priority": "Low", "title": "Legacy \"Payment Methods\" admin page duplicates the real PayPal settings in Integrations", "status": "open"},
+    {"priority": "Low", "title": "Legacy \"Payment Methods\" admin page duplicated the real PayPal/Stripe/Flutterwave/Paystack settings in Integrations — removed", "status": "resolved"},
     {"priority": "Low", "title": "Tax rate setting exists in admin but isn't applied to checkout totals", "status": "open"},
 ]
 
@@ -107,6 +106,8 @@ def init_admin(app, products, categories, blog_posts):
         sync_products_to_db()
         reload_products_from_db()
         reload_blog_posts_from_db()
+    if not app.config.get("TESTING"):
+        start_abandoned_cart_scheduler(app)
 
 
 def get_db():
@@ -240,6 +241,11 @@ def init_db():
           address TEXT DEFAULT '', city TEXT DEFAULT '',
           state TEXT DEFAULT '', postal_code TEXT DEFAULT '',
           country TEXT DEFAULT '', created_at TEXT NOT NULL
+        );
+        CREATE TABLE IF NOT EXISTS stock_log (
+          id INTEGER PRIMARY KEY AUTOINCREMENT, product_slug TEXT NOT NULL,
+          change_qty INTEGER NOT NULL, reason TEXT NOT NULL, reference TEXT DEFAULT '',
+          stock_after INTEGER NOT NULL, created_at TEXT NOT NULL
         );
         CREATE TABLE IF NOT EXISTS gift_cards (
           id INTEGER PRIMARY KEY AUTOINCREMENT, code TEXT UNIQUE NOT NULL,
@@ -476,6 +482,78 @@ def save_contact_message(name, email, subject, message):
     )
 
 
+def send_inquiry_autoresponse(name, email):
+    from flask import current_app, render_template
+
+    settings = load_setting("settings", {}) or {}
+    if settings.get("inquiry_autoresponse_enabled", True) is False:
+        return False
+
+    html_body = render_template(
+        "emails/inquiry_autoresponse.html",
+        customer_name=name,
+        autoresponse_message=settings.get(
+            "inquiry_autoresponse_message",
+            "Thank you for reaching out to Aluyè Naturals. We've received your message and will reply within two business days.",
+        ),
+    )
+    success, error = send_mail(
+        subject=settings.get("inquiry_autoresponse_subject") or "We've received your message 🌿",
+        recipients=[email],
+        html=html_body,
+    )
+    if not success:
+        add_notification("email_error", "Inquiry auto-response failed", f"{email}: {error}")
+    return success
+
+
+def check_abandoned_carts(app):
+    with app.test_request_context("/"):
+        settings = load_setting("settings", {}) or {}
+        if not settings.get("abandoned_cart_enabled"):
+            return
+        try:
+            delay_hours = float(settings.get("abandoned_cart_delay_hours") or 24)
+        except (TypeError, ValueError):
+            delay_hours = 24
+        cutoff = (datetime.now() - timedelta(hours=delay_hours)).isoformat(timespec="minutes")
+
+        db = get_db()
+        rows = db.execute(
+            "SELECT * FROM abandoned_carts WHERE reminded=0 AND created_at<=?", (cutoff,)
+        ).fetchall()
+        for row in rows:
+            items = json.loads(row["items"])
+            html_body = render_template(
+                "emails/abandoned_cart.html",
+                items=items,
+                total=row["total"],
+                reminder_message=settings.get(
+                    "abandoned_cart_message",
+                    "Your ritual is still waiting for you. Complete your order before it sells out.",
+                ),
+                site_url=app.config.get("SITE_URL", ""),
+            )
+            success, error = send_mail(
+                subject=settings.get("abandoned_cart_subject") or "You left something in your cart 🌿",
+                recipients=[row["email"]],
+                html=html_body,
+            )
+            if not success:
+                add_notification("email_error", "Abandoned cart email failed", f"{row['email']}: {error}")
+            db.execute("UPDATE abandoned_carts SET reminded=1 WHERE id=?", (row["id"],))
+        db.commit()
+
+
+def start_abandoned_cart_scheduler(app):
+    from apscheduler.schedulers.background import BackgroundScheduler
+
+    scheduler = BackgroundScheduler(daemon=True)
+    scheduler.add_job(lambda: check_abandoned_carts(app), "interval", minutes=30)
+    scheduler.start()
+    return scheduler
+
+
 def get_admin_email():
     settings = load_setting("settings", {}) or {}
     return (
@@ -534,8 +612,12 @@ def send_mail(subject, recipients, html, reply_to=None):
 def send_welcome_email(email, source="website"):
     from flask import current_app, render_template
 
+    settings = load_setting("settings", {}) or {}
+    if settings.get("welcome_email_enabled", True) is False:
+        return False
+
     first_name = email.split("@")[0].replace(".", " ").replace("_", " ").title()
-    discount_code = "RITUAL10" if source == "exit_popup" else "RITUAL15"
+    discount_code = settings.get("welcome_discount_code") or ("RITUAL10" if source == "exit_popup" else "RITUAL15")
     discount_percent = 10 if source == "exit_popup" else 15
     featured_products = [p for p in PRODUCTS_REF if "Best Seller" in p.get("tags", [])][:3]
 
@@ -545,17 +627,57 @@ def send_welcome_email(email, source="website"):
         email=email,
         discount_code=discount_code,
         discount_percent=discount_percent,
+        custom_message=settings.get("welcome_email_body", ""),
         featured_products=featured_products,
         site_url=current_app.config.get("SITE_URL", ""),
     )
+    subject = settings.get("welcome_email_subject") or (
+        "Welcome to Aluyè Naturals 🌿 — Your exclusive "
+        f"{discount_percent}% off is inside"
+    )
     success, error = send_mail(
-        subject="Welcome to Aluyè Naturals 🌿 — Your exclusive "
-        f"{discount_percent}% off is inside",
+        subject=subject,
         recipients=[email],
         html=html_body,
     )
     if not success:
         add_notification("email_error", "Welcome email failed", f"{email}: {error}")
+    return success
+
+
+def send_order_status_email(order, new_status, tracking=""):
+    from flask import current_app, render_template
+
+    settings = load_setting("settings", {}) or {}
+    key = new_status.lower()
+    if settings.get(f"{key}_email_enabled", True) is False:
+        return False
+    if not order["email"]:
+        return False
+
+    default_subject = f"Your Aluyè Naturals order {order['order_number']} has {'shipped' if key == 'shipped' else 'been delivered'} 🌿"
+    default_message = (
+        "Your order is on its way to you."
+        if key == "shipped"
+        else "Your order has been delivered. We hope you love your ritual."
+    )
+    html_body = render_template(
+        "emails/order_status.html",
+        customer_name=order["customer_name"],
+        order_number=order["order_number"],
+        status_heading=f"Your order has {'shipped' if key == 'shipped' else 'been delivered'}",
+        status_message=settings.get(f"{key}_email_message") or default_message,
+        tracking=tracking,
+        contact_email=settings.get("contact_email", ""),
+        site_url=current_app.config.get("SITE_URL", ""),
+    )
+    success, error = send_mail(
+        subject=settings.get(f"{key}_email_subject") or default_subject,
+        recipients=[order["email"]],
+        html=html_body,
+    )
+    if not success:
+        add_notification("email_error", f"{new_status} email failed", f"{order['order_number']}: {error}")
     return success
 
 
@@ -599,6 +721,67 @@ def calculate_shipping(postal_code, country, method="standard"):
 
     needs_quote = bool(settings.get("shipping_manual_quote_enabled"))
     return {"available": False, "rate": None, "zone_name": None, "needs_quote": needs_quote}
+
+
+def calculate_distance_shipping(address, city, postal_code, country, method="standard", subtotal=0):
+    """Distance-based shipping via the Google Maps Distance Matrix API, using an
+    admin-configured base fee + per-km rate from the store's origin address.
+    Returns None (caller should fall back to calculate_shipping) when the feature
+    is disabled, the API key isn't configured, or the address can't be resolved.
+    Returns dict: {available, rate, zone_name, needs_quote, distance_km}."""
+    import google_maps_client
+
+    settings = load_setting("settings", {}) or {}
+    if not settings.get("distance_shipping_enabled"):
+        return None
+    if not google_maps_client.is_configured(settings):
+        return None
+    if method == "pickup" and settings.get("shipping_pickup_enabled"):
+        return {"available": True, "rate": 0.0, "zone_name": "Local pickup", "needs_quote": False, "distance_km": 0}
+
+    destination = ", ".join(part for part in [address, city, postal_code, country] if part)
+    if not destination:
+        return None
+
+    origin = settings.get("shipping_origin_address") or "Toronto, Ontario, Canada"
+    distance_km = google_maps_client.get_distance_km(origin, destination, settings)
+    if distance_km is None:
+        return None
+
+    try:
+        max_distance = float(settings.get("shipping_max_distance_km") or 0)
+    except (TypeError, ValueError):
+        max_distance = 0
+    if max_distance and distance_km > max_distance:
+        return {
+            "available": False, "rate": None, "zone_name": None,
+            "needs_quote": bool(settings.get("shipping_manual_quote_enabled")),
+            "distance_km": distance_km,
+        }
+
+    if settings.get("shipping_free_delivery_enabled"):
+        try:
+            free_minimum = float(settings.get("shipping_free_delivery_minimum") or 0)
+        except (TypeError, ValueError):
+            free_minimum = 0
+        if subtotal >= free_minimum:
+            return {"available": True, "rate": 0.0, "zone_name": "Free delivery", "needs_quote": False, "distance_km": distance_km}
+
+    try:
+        base_fee = float(settings.get("shipping_base_fee") or 0)
+    except (TypeError, ValueError):
+        base_fee = 0
+    try:
+        per_km_rate = float(settings.get("shipping_per_km_rate") or 0)
+    except (TypeError, ValueError):
+        per_km_rate = 0
+
+    rate = round(base_fee + distance_km * per_km_rate, 2)
+    return {
+        "available": True, "rate": rate,
+        "zone_name": f"Distance-based delivery ({distance_km:.1f} km)",
+        "needs_quote": False, "distance_km": distance_km,
+    }
 
 
 def save_order(
@@ -659,7 +842,15 @@ def save_order(
     return total
 
 
-def deduct_stock(items):
+def log_stock_change(product_slug, change_qty, reason, stock_after, reference=""):
+    get_db().execute(
+        """INSERT INTO stock_log(product_slug,change_qty,reason,reference,stock_after,created_at)
+           VALUES(?,?,?,?,?,?)""",
+        (product_slug, change_qty, reason, reference, stock_after, datetime.now().isoformat(timespec="minutes")),
+    )
+
+
+def deduct_stock(items, reference=""):
     db = get_db()
     for item in items:
         slug = item["product"]["slug"]
@@ -669,6 +860,7 @@ def deduct_stock(items):
             continue
         new_stock = max(0, row["stock"] - quantity)
         db.execute("UPDATE products SET stock=? WHERE slug=?", (new_stock, slug))
+        log_stock_change(slug, -quantity, "order_placed", new_stock, reference=reference)
         if new_stock < 5:
             add_notification(
                 "stock", "Low stock alert", f"{item['product']['name']} has {new_stock} units remaining."
@@ -676,7 +868,7 @@ def deduct_stock(items):
     db.commit()
 
 
-def restore_stock(order_items):
+def restore_stock(order_items, reference=""):
     db = get_db()
     for item in order_items:
         slug = item.get("slug")
@@ -686,6 +878,9 @@ def restore_stock(order_items):
             "UPDATE products SET stock = stock + ? WHERE slug=?",
             (item["quantity"], slug),
         )
+        row = db.execute("SELECT stock FROM products WHERE slug=?", (slug,)).fetchone()
+        if row:
+            log_stock_change(slug, item["quantity"], "order_cancelled", row["stock"], reference=reference)
     db.commit()
 
 
@@ -706,7 +901,6 @@ def protect_admin():
     if not session.get("admin_user_id"):
         return redirect(url_for("admin.login", next=request.path))
     if session.get("admin_role") == "Editor" and request.endpoint in {
-        "admin.configurable_section",
         "admin.shipping",
         "admin.discounts",
         "admin.account",
@@ -840,6 +1034,19 @@ def products():
     )
 
 
+@admin_bp.route("/products/stock-log")
+def stock_log():
+    db = get_db()
+    rows = db.execute(
+        "SELECT * FROM stock_log ORDER BY id DESC LIMIT 200"
+    ).fetchall()
+    return render_template(
+        "admin/stock_log.html",
+        admin_section="products",
+        entries=rows,
+    )
+
+
 @admin_bp.route("/products/new", methods=["GET", "POST"])
 @admin_bp.route("/products/<slug>/edit", methods=["GET", "POST"])
 def product_form(slug=None):
@@ -919,6 +1126,11 @@ def product_form(slug=None):
                    status=excluded.status,updated_at=excluded.updated_at""",
                 (new_slug, json.dumps(product), stock, status, datetime.now().isoformat(timespec="minutes")),
             )
+            if existing is not None and existing.get("stock") != stock:
+                log_stock_change(
+                    new_slug, stock - existing.get("stock", 0), "admin_edit", stock,
+                    reference=session.get("admin_username", "admin"),
+                )
             db.commit()
             reload_products_from_db()
             if stock < 5:
@@ -959,16 +1171,17 @@ def order_detail(order_id):
     db = get_db()
     if request.method == "POST":
         old_order = db.execute(
-            "SELECT order_number,status,items FROM orders WHERE id=?", (order_id,)
+            "SELECT order_number,status,items,customer_name,email FROM orders WHERE id=?", (order_id,)
         ).fetchone()
         new_status = request.form.get("status")
+        tracking = request.form.get("tracking", "")
         if new_status == "Cancelled" and old_order and old_order["status"] != "Cancelled":
-            restore_stock(json.loads(old_order["items"]))
+            restore_stock(json.loads(old_order["items"]), reference=old_order["order_number"])
         db.execute(
             "UPDATE orders SET status=?,tracking=?,updated_at=? WHERE id=?",
             (
                 new_status,
-                request.form.get("tracking", ""),
+                tracking,
                 datetime.now().isoformat(timespec="minutes"),
                 order_id,
             ),
@@ -980,6 +1193,8 @@ def order_detail(order_id):
                 "Order status updated",
                 f"{old_order['order_number']} is now {new_status}.",
             )
+            if new_status in ("Shipped", "Delivered"):
+                send_order_status_email(old_order, new_status, tracking)
         record_activity(f"Updated order #{order_id}")
         flash("Order updated.", "success")
     order = db.execute("SELECT * FROM orders WHERE id=?", (order_id,)).fetchone()
@@ -1213,10 +1428,6 @@ def homepage():
     )
 
 
-SECTION_CONFIG = {
-    "payments": ("Payment Methods", ["stripe_enabled", "stripe_publishable", "stripe_secret", "paypal_enabled", "paypal_client", "paypal_secret", "flutterwave_enabled", "flutterwave_public", "flutterwave_secret", "paystack_enabled", "paystack_public", "paystack_secret", "bank_enabled", "bank_details", "cod_enabled"]),
-}
-
 SETTINGS_TABS = [
     ("general", "General"),
     ("branding", "Branding"),
@@ -1226,6 +1437,7 @@ SETTINGS_TABS = [
     ("store", "Store"),
     ("seo", "SEO"),
     ("newsletter", "Newsletter"),
+    ("messages", "Automated Messages"),
     ("footer", "Footer"),
     ("integrations", "Integrations"),
 ]
@@ -1251,51 +1463,16 @@ SETTINGS_DEFAULTS = {
     "low_stock_threshold": "5",
     "welcome_email_subject": "Welcome to the ritual 🌿",
     "welcome_discount_code": "RITUAL15",
+    "shipped_email_subject": "Your Aluyè Naturals order has shipped 🌿",
+    "shipped_email_message": "Your order is on its way to you.",
+    "delivered_email_subject": "Your Aluyè Naturals order has been delivered 🌿",
+    "delivered_email_message": "Your order has been delivered. We hope you love your ritual.",
+    "inquiry_autoresponse_subject": "We've received your message 🌿",
+    "inquiry_autoresponse_message": "Thank you for reaching out to Aluyè Naturals. We've received your message and will reply within two business days.",
+    "abandoned_cart_subject": "You left something in your cart 🌿",
+    "abandoned_cart_message": "Your ritual is still waiting for you. Complete your order before it sells out.",
+    "abandoned_cart_delay_hours": "24",
 }
-
-
-@admin_bp.route("/section/<section>", methods=["GET", "POST"])
-def configurable_section(section):
-    if section == "settings":
-        return redirect(url_for("admin.global_settings"))
-    if section not in SECTION_CONFIG:
-        return redirect(url_for("admin.dashboard"))
-    if session.get("admin_role") != "Super Admin":
-        flash("Only a Super Admin can access this section.", "error")
-        return redirect(url_for("admin.dashboard"))
-    title, fields = SECTION_CONFIG[section]
-    if request.method == "POST":
-        previous = load_setting(section, {}) or {}
-        data = {field: request.form.get(field, "") for field in fields}
-        for field in [f for f in fields if f.endswith("_enabled")]:
-            data[field] = field in request.form
-        if section == "payments":
-            secret_fields = (
-                "stripe_secret",
-                "paypal_secret",
-                "flutterwave_secret",
-                "paystack_secret",
-            )
-            for field in secret_fields:
-                secret = request.form.get(field, "").strip()
-                provider = field.removesuffix("_secret")
-                if secret:
-                    save_env_secret(field.upper(), secret)
-                data[field] = ""
-                data[f"{provider}_configured"] = bool(
-                    secret or previous.get(f"{provider}_configured")
-                )
-        save_setting(section, data)
-        record_activity(f"Updated {title}")
-        flash(f"{title} saved.", "success")
-        return redirect(url_for("admin.configurable_section", section=section))
-    return render_template(
-        "admin/configurable.html",
-        admin_section=section,
-        title=title,
-        fields=fields,
-        settings=load_setting(section, {}) or {},
-    )
 
 
 @admin_bp.route("/global-settings", methods=["GET", "POST"])
@@ -1328,9 +1505,11 @@ def global_settings():
         checkbox_fields = [
             "new_arrivals", "best_sellers", "brand_story", "ingredients", "journal",
             "welcome_email_enabled", "gift_wrap_enabled",
+            "shipped_email_enabled", "delivered_email_enabled",
+            "inquiry_autoresponse_enabled", "abandoned_cart_enabled",
         ]
         for field in checkbox_fields:
-            if tab in ("homepage", "store", "newsletter"):
+            if tab in ("homepage", "store", "newsletter", "messages"):
                 target[field] = field in request.form
         if tab == "integrations":
             target["paypal_sandbox"] = "paypal_sandbox" in request.form
@@ -1380,6 +1559,22 @@ def shipping():
             settings["shipping_manual_quote_enabled"] = "shipping_manual_quote_enabled" in request.form
             save_setting("settings", settings)
             flash("Shipping settings updated.", "success")
+        elif request.form.get("form_type") == "distance":
+            settings = load_setting("settings", {}) or {}
+            settings["distance_shipping_enabled"] = "distance_shipping_enabled" in request.form
+            settings["shipping_free_delivery_enabled"] = "shipping_free_delivery_enabled" in request.form
+            settings["shipping_origin_address"] = request.form.get("shipping_origin_address", "").strip() or "Toronto, Ontario, Canada"
+            settings["shipping_base_fee"] = request.form.get("shipping_base_fee", "0")
+            settings["shipping_per_km_rate"] = request.form.get("shipping_per_km_rate", "0")
+            settings["shipping_max_distance_km"] = request.form.get("shipping_max_distance_km", "0")
+            settings["shipping_free_delivery_minimum"] = request.form.get("shipping_free_delivery_minimum", "0")
+            google_maps_key = request.form.get("google_maps_key", "").strip()
+            if google_maps_key:
+                save_env_secret("GOOGLE_MAPS_API_KEY", google_maps_key)
+            settings["google_maps_configured"] = bool(google_maps_key or settings.get("google_maps_configured"))
+            save_setting("settings", settings)
+            record_activity("Updated distance-based shipping settings")
+            flash("Distance-based shipping settings updated.", "success")
         elif request.form.get("delete"):
             db.execute("DELETE FROM shipping_zones WHERE id=?", (request.form["delete"],))
             db.commit()

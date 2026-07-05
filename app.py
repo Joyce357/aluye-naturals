@@ -5,6 +5,8 @@ import re
 from pathlib import Path
 from datetime import datetime
 
+import requests
+
 from dotenv import load_dotenv
 load_dotenv()
 
@@ -29,16 +31,19 @@ from catalog import (
 )
 from admin import (
     deduct_stock,
+    get_db,
     init_admin,
     load_setting,
     record_page_view,
     record_product_event,
     save_contact_message,
     save_order,
+    send_inquiry_autoresponse,
 )
 
 
 BASE_DIR = Path(__file__).resolve().parent
+EMAIL_REGEX = r"^[^\s@]+@[^\s@]+\.[^\s@]+$"
 DEFAULT_META_TITLE = "Aluyè Naturals | Premium Organic Skincare Rooted in West Africa"
 DEFAULT_META_DESCRIPTION = (
     "Aluyè Naturals — Organic skincare rooted in West African heritage. Pure shea "
@@ -323,8 +328,7 @@ def create_app(test_config=None):
         email = (payload.get("email") or request.form.get("email", "")).strip()
         source = (payload.get("source") or request.form.get("source", "website")).strip()
 
-        email_regex = r"^[^\s@]+@[^\s@]+\.[^\s@]+$"
-        if not email or not re.match(email_regex, email):
+        if not email or not re.match(EMAIL_REGEX, email):
             return {"ok": False, "status": "invalid_email"}, 400
 
         db = get_db()
@@ -351,6 +355,62 @@ def create_app(test_config=None):
             "status": "subscribed",
             "discount_code": "RITUAL10" if source == "exit_popup" else "RITUAL15",
         }
+
+    @app.get("/api/geo-currency")
+    def geo_currency():
+        """Best-effort IP-based currency suggestion for first-time visitors.
+        Never blocks or errors the page — falls back to the admin-configured
+        default currency if geolocation is unavailable or the lookup fails."""
+        settings = load_setting("settings", {}) or {}
+        default_currency = settings.get("base_currency", "CAD")
+        geo_currency_map = {"CA": "CAD", "US": "USD", "GB": "GBP", "NG": "NGN"}
+
+        client_ip = (request.headers.get("X-Forwarded-For", "") or request.remote_addr or "").split(",")[0].strip()
+        currency = default_currency
+        if client_ip and not client_ip.startswith(("127.", "10.", "192.168.", "::1")):
+            try:
+                resp = requests.get(
+                    f"http://ip-api.com/json/{client_ip}?fields=countryCode", timeout=2
+                )
+                if resp.ok:
+                    country = resp.json().get("countryCode")
+                    currency = geo_currency_map.get(country, default_currency)
+            except requests.RequestException:
+                pass
+        return {"currency": currency}
+
+    @app.post("/api/cart/track")
+    def track_cart():
+        email = (request.get_json(silent=True) or {}).get("email", "").strip()
+        if not email or not re.match(EMAIL_REGEX, email):
+            return {"ok": False}, 400
+        items, subtotal = cart_summary()
+        if not items:
+            return {"ok": False}, 400
+
+        simple_items = [
+            {
+                "slug": item["product"]["slug"],
+                "name": item["product"]["name"],
+                "quantity": item["quantity"],
+                "price": item["product"]["price"],
+            }
+            for item in items
+        ]
+        db = get_db()
+        existing = db.execute("SELECT id FROM abandoned_carts WHERE email=?", (email,)).fetchone()
+        if existing:
+            db.execute(
+                "UPDATE abandoned_carts SET items=?,total=?,reminded=0,created_at=? WHERE id=?",
+                (json.dumps(simple_items), subtotal, datetime.now().isoformat(timespec="minutes"), existing["id"]),
+            )
+        else:
+            db.execute(
+                "INSERT INTO abandoned_carts(email,items,total,reminded,created_at) VALUES(?,?,?,0,?)",
+                (email, json.dumps(simple_items), subtotal, datetime.now().isoformat(timespec="minutes")),
+            )
+        db.commit()
+        return {"ok": True}
 
     @app.get("/unsubscribe")
     def unsubscribe():
@@ -478,6 +538,10 @@ def create_app(test_config=None):
             message = request.form.get("message", "").strip()
             if name and email and message:
                 save_contact_message(name, email, subject, message)
+                try:
+                    send_inquiry_autoresponse(name, email)
+                except Exception as exc:
+                    print(f"Inquiry autoresponse error for {email}: {exc}")
                 sent = True
             else:
                 flash("Please complete your name, email and message.", "error")
@@ -683,9 +747,16 @@ def create_app(test_config=None):
             errors["email"] = "Enter a valid email address."
         return errors
 
-    def quote_shipping(form, method="standard"):
-        from admin import calculate_shipping
+    def quote_shipping(form, method="standard", subtotal=0):
+        from admin import calculate_distance_shipping, calculate_shipping
 
+        distance_quote = calculate_distance_shipping(
+            form.get("address", ""), form.get("city", ""),
+            form.get("postal_code", ""), form.get("country", ""),
+            method=method, subtotal=subtotal,
+        )
+        if distance_quote is not None:
+            return distance_quote
         return calculate_shipping(form.get("postal_code", ""), form.get("country", ""), method=method)
 
     def send_order_emails(order_number, form, items, subtotal, shipping_fee, zone_name, payment_method, transaction_id):
@@ -741,7 +812,9 @@ def create_app(test_config=None):
             shipping_fee=shipping_fee, payment_method=payment_method,
             status=status, transaction_id=transaction_id,
         )
-        deduct_stock(items)
+        deduct_stock(items, reference=order_number)
+        get_db().execute("DELETE FROM abandoned_carts WHERE email=?", (form["email"],))
+        get_db().commit()
         try:
             send_order_emails(
                 order_number, form, items, subtotal, shipping_fee,
@@ -766,12 +839,12 @@ def create_app(test_config=None):
 
         shipping_method = request.values.get("shipping_method", "standard")
         preview_form = {"postal_code": request.values.get("postal_code", ""), "country": request.values.get("country", "")}
-        shipping_quote = quote_shipping(preview_form, shipping_method) if request.method == "GET" else None
+        shipping_quote = quote_shipping(preview_form, shipping_method, subtotal) if request.method == "GET" else None
 
         if request.method == "POST":
             form = {key: request.form.get(key, "").strip() for key in CHECKOUT_FIELDS}
             errors = validate_checkout_form(form)
-            shipping_quote = quote_shipping(form, shipping_method)
+            shipping_quote = quote_shipping(form, shipping_method, subtotal)
             if not shipping_quote["available"]:
                 if shipping_quote["needs_quote"]:
                     errors["postal_code"] = "We don't have automatic delivery pricing for this address — we'll follow up with a manual shipping quote."
@@ -819,10 +892,15 @@ def create_app(test_config=None):
 
     @app.post("/api/shipping-quote")
     def shipping_quote_api():
-        postal_code = request.form.get("postal_code", "")
-        country = request.form.get("country", "")
+        form = {
+            "address": request.form.get("address", ""),
+            "city": request.form.get("city", ""),
+            "postal_code": request.form.get("postal_code", ""),
+            "country": request.form.get("country", ""),
+        }
         method = request.form.get("shipping_method", "standard")
-        quote = quote_shipping({"postal_code": postal_code, "country": country}, method)
+        _, subtotal = cart_summary()
+        quote = quote_shipping(form, method, subtotal)
         return quote
 
     @app.post("/api/paypal/create-order")

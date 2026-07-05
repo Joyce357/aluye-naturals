@@ -178,7 +178,6 @@ def test_admin_login_protection_and_sections():
         "/admin/notifications",
         "/admin/homepage",
         "/admin/global-settings",
-        "/admin/section/payments",
         "/admin/shipping",
         "/admin/discounts",
         "/admin/journal",
@@ -291,7 +290,7 @@ def test_editor_cannot_access_super_admin_sections():
     )
     assert client.get("/admin/products").status_code == 200
     assert client.get("/admin/journal").status_code == 200
-    restricted = client.get("/admin/section/payments", follow_redirects=True)
+    restricted = client.get("/admin/shipping", follow_redirects=True)
     assert b"does not have permission" in restricted.data
 
 

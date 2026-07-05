@@ -142,6 +142,8 @@
 <script>
 (function () {
   const form = document.getElementById("checkout-form");
+  const addressInput = document.getElementById("address");
+  const cityInput = document.getElementById("city");
   const postalInput = document.getElementById("postal_code");
   const countryInput = document.getElementById("country");
   const methodInputs = form.querySelectorAll("[data-shipping-method]");
@@ -152,6 +154,19 @@
   const shippingAmountEl = document.getElementById("checkout-shipping-amount");
   const totalAmountEl = document.getElementById("checkout-total-amount");
   const subtotal = {{ subtotal }};
+
+  const emailInput = document.getElementById("email");
+  if (emailInput) {
+    emailInput.addEventListener("blur", function () {
+      const email = emailInput.value.trim();
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return;
+      fetch("/api/cart/track", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: email }),
+      }).catch(function () {});
+    });
+  }
 
   function selectedMethod() {
     const checked = form.querySelector("[data-shipping-method]:checked");
@@ -170,6 +185,8 @@
       return;
     }
     const params = new URLSearchParams({
+      address: addressInput.value,
+      city: cityInput.value,
       postal_code: postalInput.value,
       country: countryInput.value,
       shipping_method: method,
@@ -196,6 +213,8 @@
       });
   }
 
+  addressInput.addEventListener("blur", refreshQuote);
+  cityInput.addEventListener("blur", refreshQuote);
   postalInput.addEventListener("blur", refreshQuote);
   countryInput.addEventListener("blur", refreshQuote);
   methodInputs.forEach((el) => el.addEventListener("change", refreshQuote));

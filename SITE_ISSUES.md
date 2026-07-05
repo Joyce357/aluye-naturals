@@ -3,6 +3,24 @@ Last updated: 2026-07-05
 
 Status legend: 🔴 Open · ✅ Resolved & deployed · ⚪ Checked, not reproducible · — Skipped by decision
 
+## SESSION: Admin/store functionality audit (stock, subscribers, messaging, currency, shipping)
+
+27. ✅ Footer newsletter signup form (highest-traffic subscribe form, present on every page) was completely fake — showed a hardcoded "Thank you" message and never called the backend. Rebuilt to call `/api/subscribe` for real, with validation, duplicate detection, and success/error states.
+28. ✅ Stock changes (orders, cancellations, manual admin edits) were never logged anywhere for audit purposes. Added a `stock_log` table + admin view at Products → Stock log.
+29. ✅ Admin's "Send welcome email" toggle and custom subject/body fields in Global Settings → Newsletter did nothing at all — the welcome email function ignored all three. Now wired up and respected.
+30. ✅ No email was ever sent when an order was marked Shipped or Delivered. Added admin-configurable automated emails for both, plus a customer inquiry auto-response on contact form submission (Global Settings → Automated Messages).
+31. ✅ Abandoned cart table existed but nothing ever populated it. Added real capture (on checkout email entry) + an APScheduler background job that sends a configurable reminder email and marks carts as reminded. Disabled by default — admin must opt in (Global Settings → Automated Messages).
+32. ✅ Currency selector only converted displayed prices; the admin's "Default currency" setting was ignored (always defaulted to CAD) and there was no location-based suggestion. Wired the admin setting as the true default and added a best-effort geo-IP suggestion for first-time visitors (falls back silently if the lookup fails). CAD remains the only currency PayPal actually charges in, by design.
+33. 🔴 Google Maps distance-based shipping — built to spec (admin-configurable base fee, cost/km, max distance, free-delivery threshold, store origin) with automatic fallback to the existing zone system, but **not yet tested against a real Google Maps API key** (none provided this session). Zone-based shipping remains fully active until a key is added.
+
+## SESSION: Full end-to-end site + admin audit (pre-launch)
+
+34. ✅ Duplicate "Payment Methods" admin page removed — PayPal, Stripe, Flutterwave and Paystack are each now configured in exactly one place (Global Settings → Integrations). The old page saved to a settings bucket ("payments") that nothing else in the codebase ever read — so credentials entered there were silently inert. Confirmed no real credentials had ever been saved there before removing it.
+35. ✅ Product detail page threw `trackRecentlyViewed is not defined` on every single load (uncaught JS error, visible in console on every product page). Caused by an inline script calling an `app.js` function before the deferred script had executed. Fixed by deferring the call to `DOMContentLoaded`.
+36. ⚪ Full site + admin crawl (30+ public routes, 23 admin routes, 651 internal links/images) — zero broken links, zero missing images, zero HTTP 500s, zero console/JS errors after the fix above.
+37. ⚪ Admin CRUD spot-checked across Products, Discounts, Shipping Zones, Blog/Journal, Notifications, and Settings (General/SEO/Social/Automated Messages) — all create/edit/delete/save operations persist correctly.
+38. — No FAQ page exists anywhere on the site (not a bug — informational). No dedicated "Customers" or "Categories" admin modules exist either; customer data lives on Orders/Subscribers, categories are edited per-product. "Reports" maps to the existing Analytics page + CSV export.
+
 ## CRITICAL
 
 1. ✅ Meta description showing broken "trans-" template variables — fixed.
@@ -38,7 +56,7 @@ Status legend: 🔴 Open · ✅ Resolved & deployed · ⚪ Checked, not reproduc
 22. ⚪ Admin sidebar placeholder links — none found.
 23. ⚪ Missing OG image for social sharing — not reproducible; every page has a default OG image fallback.
 24. 🔴 ~16 product photos are still JPG/PNG rather than WebP — real but low-priority optimization opportunity.
-25. 🔴 A legacy "Payment Methods" admin page still duplicates the real PayPal settings now living in Global Settings → Integrations — worth consolidating/removing later.
+25. ✅ A legacy "Payment Methods" admin page duplicated the real PayPal/Stripe/Flutterwave/Paystack settings now living in Global Settings → Integrations — removed entirely (route, nav item, template, and dead settings bucket). See full-audit session below.
 26. 🔴 Tax rate is configurable in admin but not actually applied to checkout totals.
 
 ## RESOLVED (cumulative, verified across sessions)
