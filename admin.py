@@ -91,15 +91,23 @@ SITE_ISSUES = [
 NAV_ITEMS = [(key, label) for _, _, items in NAV_GROUPS for key, label in items]
 
 
+def get_data_dir(app):
+    """Directory for anything that must survive a redeploy: the database,
+    admin-saved secrets, and admin-uploaded images. Points at a Render
+    persistent disk when DATA_DIR is set (see render.yaml); otherwise falls
+    back to the app's own instance/ folder for local development."""
+    data_dir = os.environ.get("DATA_DIR") or app.instance_path
+    Path(data_dir).mkdir(parents=True, exist_ok=True)
+    return Path(data_dir)
+
+
 def init_admin(app, products, categories, blog_posts):
     global PRODUCTS_REF, CATEGORIES_REF, BLOG_POSTS_REF
     PRODUCTS_REF = products
     CATEGORIES_REF = categories
     BLOG_POSTS_REF = blog_posts
-    app.config.setdefault(
-        "ADMIN_DATABASE", str(Path(app.instance_path) / "aluye_admin.db")
-    )
-    Path(app.instance_path).mkdir(parents=True, exist_ok=True)
+    data_dir = get_data_dir(app)
+    app.config.setdefault("ADMIN_DATABASE", str(data_dir / "aluye_admin.db"))
     app.register_blueprint(admin_bp)
     with app.app_context():
         init_db()
@@ -412,7 +420,7 @@ def save_setting(key, value):
 
 
 def save_env_secret(name, value):
-    env_path = Path(current_app.root_path) / ".env"
+    env_path = get_data_dir(current_app) / ".env"
     lines = env_path.read_text(encoding="utf-8").splitlines() if env_path.exists() else []
     prefix = f"{name}="
     replacement = f"{name}={value}"
@@ -1076,15 +1084,13 @@ def product_form(slug=None):
                 "image", "photo_2_2026-06-08_18-19-49.webp"
             )
             saved_images = []
+            uploads_dir = get_data_dir(current_app) / "uploads"
+            uploads_dir.mkdir(parents=True, exist_ok=True)
             for upload in uploads:
                 if not upload or not upload.filename:
                     continue
                 filename = secure_filename(upload.filename)
-                upload.save(
-                    Path(current_app.root_path)
-                    / "Aluye Naturals Images"
-                    / filename
-                )
+                upload.save(uploads_dir / filename)
                 saved_images.append(filename)
             if saved_images:
                 image_name = saved_images[0]

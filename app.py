@@ -9,6 +9,11 @@ import requests
 
 from dotenv import load_dotenv
 load_dotenv()
+# Secrets saved via the admin dashboard live on the persistent disk (if one is
+# attached — see render.yaml) so they survive a redeploy; those take priority
+# over anything in the repo's own .env.
+if os.environ.get("DATA_DIR"):
+    load_dotenv(os.path.join(os.environ["DATA_DIR"], ".env"), override=True)
 
 from flask import (
     Flask,
@@ -270,6 +275,13 @@ def create_app(test_config=None):
 
     @app.get("/media/<collection>/<path:filename>")
     def media(collection, filename):
+        if collection == "products":
+            from admin import get_data_dir
+
+            uploads_dir = get_data_dir(app) / "uploads"
+            if (uploads_dir / filename).exists():
+                return send_from_directory(uploads_dir, filename)
+
         folders = {
             "products": BASE_DIR / "Aluye Naturals Images",
             "hero": BASE_DIR / "Aluye Naturals Hero",

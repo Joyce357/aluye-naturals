@@ -4,6 +4,12 @@ services:
     env: python
     buildCommand: pip install -r requirements.txt
     startCommand: gunicorn app:app
+    # Persistent disk (requires a paid Render plan, not available on Free):
+    # without one, the database and any secrets/images saved through the admin
+    # dashboard are wiped on every redeploy or restart. When ready to upgrade,
+    # add a disk here (name: aluye-data, mountPath: /var/data, sizeGB: 1) and a
+    # DATA_DIR env var set to that same mount path — the app already supports
+    # this (see admin.get_data_dir), no code changes needed.
     envVars:
       - key: FLASK_ENV
         value: production
