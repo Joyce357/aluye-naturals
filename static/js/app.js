@@ -467,8 +467,8 @@ document
         status.classList.add("text-shea");
         status.textContent =
           data.status === "already_subscribed"
-            ? "You're already on the list ✓"
-            : "Thank you. Your ritual notes are on their way ✓";
+            ? "You're already subscribed."
+            : "Thank you for subscribing to Aluyè Naturals.";
         form.reset();
       } else {
         status.classList.remove("text-shea");

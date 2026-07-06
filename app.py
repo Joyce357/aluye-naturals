@@ -2,10 +2,21 @@ import gzip
 import json
 import os
 import re
+import sys
 from pathlib import Path
 from datetime import datetime
 
 import requests
+
+# Some server locales default stdout/stderr to a non-UTF-8 codec, which makes
+# print() raise UnicodeEncodeError on anything containing non-ASCII text (e.g.
+# "Aluyè" or an emoji in a logged email subject/error). That's happened before
+# in error-logging paths and turned a caught, harmless failure (like a bad SMTP
+# login) into an uncaught 500 for the whole request. Force UTF-8 with lossy
+# replacement so logging can never crash a request, regardless of container locale.
+for _stream in (sys.stdout, sys.stderr):
+    if hasattr(_stream, "reconfigure"):
+        _stream.reconfigure(encoding="utf-8", errors="replace")
 
 from dotenv import load_dotenv
 load_dotenv()
@@ -352,17 +363,34 @@ def create_app(test_config=None):
         if existing:
             return {"ok": True, "status": "already_subscribed"}
 
+        subscribed_at = datetime.now().isoformat(timespec="minutes")
         db.execute(
             "INSERT INTO subscribers(email, created_at, source) VALUES(?, ?, ?)",
-            (email, datetime.now().isoformat(timespec="minutes"), source),
+            (email, subscribed_at, source),
         )
         db.commit()
-        add_notification("subscriber", "New subscriber", email)
 
         try:
-            send_welcome_email(email, source=source)
+            welcome_status = send_welcome_email(email, source=source)
         except Exception as exc:
             print(f"Welcome email error for {email}: {exc}")
+            welcome_status = "failed"
+
+        status_label = {
+            "sent": "Sent", "failed": "Failed", "not_configured": "Pending",
+            "disabled": "Pending",
+        }.get(welcome_status, "Pending")
+        add_notification(
+            "subscriber",
+            "New subscriber",
+            f"{email} — subscribed {subscribed_at} — welcome email: {status_label}",
+        )
+        if welcome_status == "not_configured":
+            add_notification(
+                "email_error",
+                "Email sending is not configured",
+                "Set up SMTP in Global Settings → Integrations so welcome emails actually send.",
+            )
 
         return {
             "ok": True,

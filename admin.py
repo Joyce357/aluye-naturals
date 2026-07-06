@@ -626,11 +626,12 @@ def send_mail(subject, recipients, html, reply_to=None):
 
 
 def send_welcome_email(email, source="website"):
+    """Returns a status string: "sent", "failed", "not_configured", or "disabled"."""
     from flask import current_app, render_template
 
     settings = load_setting("settings", {}) or {}
     if settings.get("welcome_email_enabled", True) is False:
-        return False
+        return "disabled"
 
     first_name = email.split("@")[0].replace(".", " ").replace("_", " ").title()
     discount_code = settings.get("welcome_discount_code") or ("RITUAL10" if source == "exit_popup" else "RITUAL15")
@@ -643,14 +644,14 @@ def send_welcome_email(email, source="website"):
         email=email,
         discount_code=discount_code,
         discount_percent=discount_percent,
-        custom_message=settings.get("welcome_email_body", ""),
+        custom_message=settings.get("welcome_email_body")
+        or "We're excited to have you in our community. You'll be the first to receive "
+        "updates about our natural skincare products, new arrivals, special offers, "
+        "beauty tips, and wellness rituals.",
         featured_products=featured_products,
         site_url=current_app.config.get("SITE_URL", ""),
     )
-    subject = settings.get("welcome_email_subject") or (
-        "Welcome to Aluyè Naturals 🌿 — Your exclusive "
-        f"{discount_percent}% off is inside"
-    )
+    subject = settings.get("welcome_email_subject") or "Thank you for subscribing to Aluyè Naturals"
     success, error = send_mail(
         subject=subject,
         recipients=[email],
@@ -658,7 +659,10 @@ def send_welcome_email(email, source="website"):
     )
     if not success:
         add_notification("email_error", "Welcome email failed", f"{email}: {error}")
-    return success
+        return "failed"
+    if current_app.config.get("MAIL_SUPPRESS_SEND"):
+        return "not_configured"
+    return "sent"
 
 
 def send_order_status_email(order, new_status, tracking=""):
@@ -1473,7 +1477,7 @@ SETTINGS_DEFAULTS = {
     "returns_window": "30",
     "gift_wrap_price": "3",
     "low_stock_threshold": "5",
-    "welcome_email_subject": "Welcome to the ritual 🌿",
+    "welcome_email_subject": "Thank you for subscribing to Aluyè Naturals",
     "welcome_discount_code": "RITUAL15",
     "shipped_email_subject": "Your Aluyè Naturals order has shipped 🌿",
     "shipped_email_message": "Your order is on its way to you.",
