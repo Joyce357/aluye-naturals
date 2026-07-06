@@ -425,6 +425,11 @@ def save_env_secret(name, value):
     if not updated:
         lines.append(replacement)
     env_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    # Take effect immediately in this worker process rather than only on next
+    # restart. On platforms with an ephemeral filesystem (e.g. Render without a
+    # persistent disk attached), this .env file will not survive a redeploy —
+    # see MAIL_USERNAME/MAIL_PASSWORD handling for the durable alternative.
+    os.environ[name] = value
 
 
 def record_activity(action):
@@ -605,7 +610,10 @@ def send_mail(subject, recipients, html, reply_to=None):
         mail.send(msg)
         return True, None
     except Exception as exc:
-        print(f"Email send failed ({subject} -> {recipients}): {exc}")
+        try:
+            print(f"Email send failed ({subject} -> {recipients}): {exc}")
+        except UnicodeEncodeError:
+            print(f"Email send failed ({recipients}): {exc}".encode("ascii", "backslashreplace").decode("ascii"))
         return False, str(exc)
 
 
