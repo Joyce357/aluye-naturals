@@ -1272,7 +1272,6 @@ def messages():
 
 @admin_bp.route("/messages/<int:message_id>", methods=["GET", "POST"])
 def message_detail(message_id):
-    db = get_db()
     msg = database.fetch_one("SELECT * FROM messages WHERE id = :id", {"id": message_id})
     if not msg:
         flash("Message not found.", "error")
@@ -1285,18 +1284,20 @@ def message_detail(message_id):
         reply_text = request.form.get("reply_text", "").strip()
 
         if action == "discard_draft":
-            db.execute("DELETE FROM message_drafts WHERE message_id=?", (message_id,))
-            db.commit()
+            database.execute_write("DELETE FROM message_drafts WHERE message_id = :message_id", {"message_id": message_id})
             flash("Draft discarded.", "success")
             return redirect(url_for("admin.message_detail", message_id=message_id))
 
         if action == "save_draft" and reply_text:
-            db.execute(
-                """INSERT INTO message_drafts(message_id, draft_text, updated_at) VALUES(?,?,?)
+            database.execute_write(
+                """INSERT INTO message_drafts(message_id, draft_text, updated_at) VALUES(:message_id, :draft_text, :updated_at)
                    ON CONFLICT(message_id) DO UPDATE SET draft_text=excluded.draft_text, updated_at=excluded.updated_at""",
-                (message_id, reply_text, datetime.now().isoformat(timespec="minutes")),
+                {
+                    "message_id": message_id,
+                    "draft_text": reply_text,
+                    "updated_at": datetime.now().isoformat(timespec="minutes"),
+                },
             )
-            db.commit()
             flash("Draft saved.", "success")
             return redirect(url_for("admin.message_detail", message_id=message_id))
 
@@ -1313,13 +1314,27 @@ def message_detail(message_id):
                 html=email_html,
             )
 
-            db.execute(
-                "INSERT INTO message_replies(message_id, reply_text, replied_by, created_at) VALUES(?,?,?,?)",
-                (message_id, reply_text, session.get("admin_username", "admin"), datetime.now().isoformat(timespec="minutes")),
-            )
-            database.execute_write("UPDATE messages SET status = 'replied' WHERE id = :id", {"id": message_id})
-            db.execute("DELETE FROM message_drafts WHERE message_id=?", (message_id,))
-            db.commit()
+            with database.transaction() as conn:
+                conn.execute(
+                    text(
+                        "INSERT INTO message_replies(message_id, reply_text, replied_by, created_at) "
+                        "VALUES(:message_id, :reply_text, :replied_by, :created_at)"
+                    ),
+                    {
+                        "message_id": message_id,
+                        "reply_text": reply_text,
+                        "replied_by": session.get("admin_username", "admin"),
+                        "created_at": datetime.now().isoformat(timespec="minutes"),
+                    },
+                )
+                conn.execute(
+                    text("UPDATE messages SET status = 'replied' WHERE id = :id"),
+                    {"id": message_id},
+                )
+                conn.execute(
+                    text("DELETE FROM message_drafts WHERE message_id = :message_id"),
+                    {"message_id": message_id},
+                )
 
             record_activity(f"Replied to message #{message_id}")
             if sent:
@@ -1328,12 +1343,14 @@ def message_detail(message_id):
                 flash(f"Reply saved but email could not be sent: {mail_error}. Check SMTP settings in Global Settings → Integrations.", "error")
             return redirect(url_for("admin.message_detail", message_id=message_id))
 
-    replies = db.execute(
-        "SELECT * FROM message_replies WHERE message_id=? ORDER BY created_at", (message_id,)
-    ).fetchall()
-    draft = db.execute(
-        "SELECT * FROM message_drafts WHERE message_id=?", (message_id,)
-    ).fetchone()
+    replies = database.fetch_all(
+        "SELECT * FROM message_replies WHERE message_id = :message_id ORDER BY created_at",
+        {"message_id": message_id},
+    )
+    draft = database.fetch_one(
+        "SELECT * FROM message_drafts WHERE message_id = :message_id",
+        {"message_id": message_id},
+    )
     return render_template(
         "admin/message_detail.html",
         admin_section="messages",
