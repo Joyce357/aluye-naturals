@@ -496,16 +496,27 @@ def record_product_event(slug, event):
 
 
 def save_contact_message(name, email, subject, message):
-    db = get_db()
-    cursor = db.execute(
-        "INSERT INTO messages(name,email,subject,message,created_at) VALUES(?,?,?,?,?)",
-        (name, email, subject, message, datetime.now().isoformat(timespec="minutes")),
-    )
-    db.commit()
+    created_at = datetime.now().isoformat(timespec="minutes")
+    with database.transaction() as conn:
+        result = conn.execute(
+            text(
+                "INSERT INTO messages(name,email,subject,message,created_at) "
+                "VALUES(:name,:email,:subject,:message,:created_at) RETURNING id"
+            ),
+            {
+                "name": name,
+                "email": email,
+                "subject": subject,
+                "message": message,
+                "created_at": created_at,
+            },
+        )
+        msg_id = result.scalar_one()
     add_notification(
         "message", "New contact message", f"{name}: {subject}",
-        related_type="message", related_id=str(cursor.lastrowid),
+        related_type="message", related_id=str(msg_id),
     )
+
 
 
 def send_inquiry_autoresponse(name, email):
@@ -958,9 +969,10 @@ def inject_admin_context():
             "name": session.get("admin_name", "Administrator"),
             "role": session.get("admin_role", "Super Admin"),
         },
-        "admin_unread_messages": db.execute(
-            "SELECT COUNT(*) c FROM messages WHERE status='unread'"
-        ).fetchone()["c"],
+        "admin_unread_messages": (
+            database.fetch_one("SELECT COUNT(*) c FROM messages WHERE status='unread'") or {}
+        ).get("c", 0),
+
         "admin_unread_notifications": db.execute(
             "SELECT COUNT(*) c FROM notifications WHERE is_read=0 AND archived=0"
         ).fetchone()["c"],
@@ -1012,9 +1024,10 @@ def dashboard():
         ("Total products", len(PRODUCTS_REF), "Live catalogue"),
         (
             "New messages",
-            db.execute("SELECT COUNT(*) c FROM messages WHERE status='unread'").fetchone()["c"],
+            (database.fetch_one("SELECT COUNT(*) c FROM messages WHERE status='unread'") or {}).get("c", 0),
             "Unread inbox",
         ),
+
         ("Low stock alerts", low_stock, "Below 5 units"),
     ]
     chart = [42, 48, 46, 60, 58, 72, 68, 80, 77, 92, 88, 105]
@@ -1242,30 +1255,30 @@ def order_detail(order_id):
 
 @admin_bp.route("/messages", methods=["GET", "POST"])
 def messages():
-    db = get_db()
     if request.method == "POST":
         message_id = request.form.get("message_id")
         action = request.form.get("action")
         if action == "delete":
-            db.execute("DELETE FROM messages WHERE id=?", (message_id,))
+            database.execute_write("DELETE FROM messages WHERE id = :id", {"id": message_id})
         else:
-            db.execute("UPDATE messages SET status=? WHERE id=?", (action, message_id))
-        db.commit()
+            database.execute_write(
+                "UPDATE messages SET status = :status WHERE id = :id",
+                {"status": action, "id": message_id},
+            )
         flash("Inbox updated.", "success")
-    rows = db.execute("SELECT * FROM messages ORDER BY created_at DESC").fetchall()
+    rows = database.fetch_all("SELECT * FROM messages ORDER BY created_at DESC")
     return render_template("admin/messages.html", admin_section="messages", messages=rows)
 
 
 @admin_bp.route("/messages/<int:message_id>", methods=["GET", "POST"])
 def message_detail(message_id):
     db = get_db()
-    msg = db.execute("SELECT * FROM messages WHERE id=?", (message_id,)).fetchone()
+    msg = database.fetch_one("SELECT * FROM messages WHERE id = :id", {"id": message_id})
     if not msg:
         flash("Message not found.", "error")
         return redirect(url_for("admin.messages"))
     if msg["status"] == "unread":
-        db.execute("UPDATE messages SET status='read' WHERE id=?", (message_id,))
-        db.commit()
+        database.execute_write("UPDATE messages SET status = 'read' WHERE id = :id", {"id": message_id})
 
     if request.method == "POST":
         action = request.form.get("action", "send")
@@ -1304,9 +1317,10 @@ def message_detail(message_id):
                 "INSERT INTO message_replies(message_id, reply_text, replied_by, created_at) VALUES(?,?,?,?)",
                 (message_id, reply_text, session.get("admin_username", "admin"), datetime.now().isoformat(timespec="minutes")),
             )
-            db.execute("UPDATE messages SET status='replied' WHERE id=?", (message_id,))
+            database.execute_write("UPDATE messages SET status = 'replied' WHERE id = :id", {"id": message_id})
             db.execute("DELETE FROM message_drafts WHERE message_id=?", (message_id,))
             db.commit()
+
             record_activity(f"Replied to message #{message_id}")
             if sent:
                 flash(f"Reply sent to {msg['email']} ✓", "success")
@@ -1792,9 +1806,7 @@ def issues_admin():
 
 @admin_bp.get("/subscribers")
 def subscribers_admin():
-    rows = get_db().execute(
-        "SELECT * FROM subscribers ORDER BY created_at DESC"
-    ).fetchall()
+    rows = database.fetch_all("SELECT * FROM subscribers ORDER BY created_at DESC")
     return render_template(
         "admin/subscribers.html",
         admin_section="subscribers_admin",
@@ -1804,9 +1816,8 @@ def subscribers_admin():
 
 @admin_bp.get("/subscribers/export.csv")
 def subscribers_export():
-    rows = get_db().execute(
-        "SELECT email, source, created_at FROM subscribers ORDER BY created_at DESC"
-    ).fetchall()
+    rows = database.fetch_all("SELECT email, source, created_at FROM subscribers ORDER BY created_at DESC")
+
     output = io.StringIO()
     writer = csv.writer(output)
     writer.writerow(["Email", "Source", "Subscribed", "Status"])

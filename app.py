@@ -7,6 +7,7 @@ from pathlib import Path
 from datetime import datetime
 
 import requests
+import database
 
 # Some server locales default stdout/stderr to a non-UTF-8 codec, which makes
 # print() raise UnicodeEncodeError on anything containing non-ASCII text (e.g.
@@ -364,19 +365,16 @@ def create_app(test_config=None):
         if not email or not re.match(EMAIL_REGEX, email):
             return {"ok": False, "status": "invalid_email"}, 400
 
-        db = get_db()
-        existing = db.execute(
-            "SELECT 1 FROM subscribers WHERE email=?", (email,)
-        ).fetchone()
+        existing = database.fetch_one("SELECT 1 FROM subscribers WHERE email = :email", {"email": email})
         if existing:
             return {"ok": True, "status": "already_subscribed"}
 
         subscribed_at = datetime.now().isoformat(timespec="minutes")
-        db.execute(
-            "INSERT INTO subscribers(email, created_at, source) VALUES(?, ?, ?)",
-            (email, subscribed_at, source),
+        database.execute_write(
+            "INSERT INTO subscribers(email, created_at, source) VALUES(:email, :created_at, :source)",
+            {"email": email, "created_at": subscribed_at, "source": source},
         )
-        db.commit()
+
 
         try:
             welcome_status = send_welcome_email(email, source=source)
@@ -464,14 +462,11 @@ def create_app(test_config=None):
 
     @app.get("/unsubscribe")
     def unsubscribe():
-        from admin import get_db
-
         email = request.args.get("email", "").strip()
         if email:
-            db = get_db()
-            db.execute("DELETE FROM subscribers WHERE email=?", (email,))
-            db.commit()
+            database.execute_write("DELETE FROM subscribers WHERE email = :email", {"email": email})
         return render_template("unsubscribe.html", email=email)
+
 
     @app.get("/shop")
     def shop():
