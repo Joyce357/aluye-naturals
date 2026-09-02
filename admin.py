@@ -3,6 +3,7 @@ import io
 import json
 import os
 import sqlite3
+import database
 from datetime import datetime, timedelta
 from functools import wraps
 from pathlib import Path
@@ -108,6 +109,7 @@ def init_admin(app, products, categories, blog_posts):
     BLOG_POSTS_REF = blog_posts
     data_dir = get_data_dir(app)
     app.config.setdefault("ADMIN_DATABASE", str(data_dir / "aluye_admin.db"))
+    database.init_app(app)
     app.register_blueprint(admin_bp)
     with app.app_context():
         init_db()
@@ -119,16 +121,12 @@ def init_admin(app, products, categories, blog_posts):
 
 
 def get_db():
-    if "admin_db" not in g:
-        g.admin_db = sqlite3.connect(current_app.config["ADMIN_DATABASE"])
-        g.admin_db.row_factory = sqlite3.Row
-    return g.admin_db
+    return database.get_db()
 
 
 def close_db(_error=None):
-    db = g.pop("admin_db", None)
-    if db is not None:
-        db.close()
+    return database.close_db(_error)
+
 
 
 def init_db():
