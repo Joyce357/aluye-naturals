@@ -373,13 +373,14 @@ def reload_products_from_db():
 
 
 def reload_blog_posts_from_db():
-    rows = get_db().execute(
+    rows = database.fetch_all(
         "SELECT slug,title,category,body FROM blog_posts WHERE status='published' ORDER BY created_at"
-    ).fetchall()
+    )
     managed_slugs = {
         row["slug"]
-        for row in get_db().execute("SELECT slug FROM blog_posts").fetchall()
+        for row in database.fetch_all("SELECT slug FROM blog_posts")
     }
+
     BLOG_POSTS_REF[:] = [
         post for post in BLOG_POSTS_REF if post["slug"] not in managed_slugs
     ]
@@ -555,10 +556,10 @@ def check_abandoned_carts(app):
             delay_hours = 24
         cutoff = (datetime.now() - timedelta(hours=delay_hours)).isoformat(timespec="minutes")
 
-        db = get_db()
-        rows = db.execute(
-            "SELECT * FROM abandoned_carts WHERE reminded=0 AND created_at<=?", (cutoff,)
-        ).fetchall()
+        rows = database.fetch_all(
+            "SELECT * FROM abandoned_carts WHERE reminded = 0 AND created_at <= :cutoff",
+            {"cutoff": cutoff},
+        )
         for row in rows:
             items = json.loads(row["items"])
             html_body = render_template(
@@ -578,8 +579,8 @@ def check_abandoned_carts(app):
             )
             if not success:
                 add_notification("email_error", "Abandoned cart email failed", f"{row['email']}: {error}")
-            db.execute("UPDATE abandoned_carts SET reminded=1 WHERE id=?", (row["id"],))
-        db.commit()
+            database.execute_write("UPDATE abandoned_carts SET reminded = 1 WHERE id = :id", {"id": row["id"]})
+
 
 
 def start_abandoned_cart_scheduler(app):
@@ -747,7 +748,8 @@ def calculate_shipping(postal_code, country, method="standard"):
     is_canada = "canada" in country_norm or country_norm in ("ca", "can")
     is_usa = country_norm in ("us", "usa", "united states", "united states of america")
 
-    zones = get_db().execute("SELECT * FROM shipping_zones WHERE enabled=1").fetchall()
+    zones = database.fetch_all("SELECT * FROM shipping_zones WHERE enabled = 1")
+
 
     if is_canada:
         for zone in zones:
@@ -1639,75 +1641,69 @@ def shipping():
             record_activity("Updated distance-based shipping settings")
             flash("Distance-based shipping settings updated.", "success")
         elif request.form.get("delete"):
-            db.execute("DELETE FROM shipping_zones WHERE id=?", (request.form["delete"],))
-            db.commit()
+            database.execute_write("DELETE FROM shipping_zones WHERE id = :id", {"id": request.form["delete"]})
             flash("Shipping zone deleted.", "success")
         else:
             name = request.form.get("name", "").strip()
             if not name:
                 flash("Zone name is required.", "error")
             else:
-                db.execute(
-                    "INSERT INTO shipping_zones(name,rate,threshold,delivery_days,postal_prefixes,enabled) VALUES(?,?,?,?,?,?)",
-                    (
-                        name,
-                        float(request.form.get("rate") or 0),
-                        0,
-                        request.form.get("delivery_days"),
-                        request.form.get("postal_prefixes", "").strip().upper(),
-                        1,
-                    ),
+                database.execute_write(
+                    "INSERT INTO shipping_zones(name,rate,threshold,delivery_days,postal_prefixes,enabled) VALUES(:name,:rate,:threshold,:delivery_days,:postal_prefixes,1)",
+                    {
+                        "name": name,
+                        "rate": float(request.form.get("rate") or 0),
+                        "threshold": 0,
+                        "delivery_days": request.form.get("delivery_days"),
+                        "postal_prefixes": request.form.get("postal_prefixes", "").strip().upper(),
+                    },
                 )
-                db.commit()
                 flash("Shipping zone added.", "success")
         return redirect(url_for("admin.shipping"))
     settings = load_setting("settings", {}) or {}
     return render_template(
         "admin/shipping.html",
         admin_section="shipping",
-        zones=db.execute("SELECT * FROM shipping_zones ORDER BY name").fetchall(),
+        zones=database.fetch_all("SELECT * FROM shipping_zones ORDER BY name"),
         s=settings,
     )
 
 
 @admin_bp.route("/discounts", methods=["GET", "POST"])
 def discounts():
-    db = get_db()
     if request.method == "POST":
         if request.form.get("delete"):
-            db.execute("DELETE FROM discounts WHERE id=?", (request.form["delete"],))
+            database.execute_write("DELETE FROM discounts WHERE id = :id", {"id": request.form["delete"]})
         else:
-            db.execute(
+            database.execute_write(
                 """INSERT INTO discounts(code,type,value,minimum,expiry,usage_limit,enabled)
-                   VALUES(?,?,?,?,?,?,1)""",
-                (
-                    request.form.get("code", "").upper(),
-                    request.form.get("type"),
-                    float(request.form.get("value") or 0),
-                    float(request.form.get("minimum") or 0),
-                    request.form.get("expiry"),
-                    int(request.form.get("usage_limit") or 0),
-                ),
+                   VALUES(:code,:type,:value,:minimum,:expiry,:usage_limit,1)""",
+                {
+                    "code": request.form.get("code", "").upper(),
+                    "type": request.form.get("type"),
+                    "value": float(request.form.get("value") or 0),
+                    "minimum": float(request.form.get("minimum") or 0),
+                    "expiry": request.form.get("expiry"),
+                    "usage_limit": int(request.form.get("usage_limit") or 0),
+                },
             )
-        db.commit()
         flash("Discount codes updated.", "success")
     return render_template(
         "admin/discounts.html",
         admin_section="discounts",
-        discounts=db.execute("SELECT * FROM discounts ORDER BY id DESC").fetchall(),
+        discounts=database.fetch_all("SELECT * FROM discounts ORDER BY id DESC"),
     )
 
 
 @admin_bp.route("/journal", methods=["GET", "POST"])
 def journal():
-    db = get_db()
     if request.method == "POST":
         if request.form.get("delete"):
             post_id = request.form["delete"]
-            row = db.execute(
-                "SELECT slug FROM blog_posts WHERE id=?", (post_id,)
-            ).fetchone()
-            db.execute("DELETE FROM blog_posts WHERE id=?", (post_id,))
+            row = database.fetch_one(
+                "SELECT slug FROM blog_posts WHERE id = :id", {"id": post_id}
+            )
+            database.execute_write("DELETE FROM blog_posts WHERE id = :id", {"id": post_id})
             if row:
                 BLOG_POSTS_REF[:] = [
                     post for post in BLOG_POSTS_REF if post["slug"] != row["slug"]
@@ -1715,17 +1711,17 @@ def journal():
         else:
             title = request.form.get("title", "").strip()
             slug = request.form.get("slug", "").strip() or title.lower().replace(" ", "-")
-            db.execute(
+            database.execute_write(
                 """INSERT INTO blog_posts(slug,title,category,body,status,created_at)
-                   VALUES(?,?,?,?,?,?)""",
-                (
-                    slug,
-                    title,
-                    request.form.get("category"),
-                    request.form.get("body"),
-                    request.form.get("status"),
-                    datetime.now().isoformat(timespec="minutes"),
-                ),
+                   VALUES(:slug,:title,:category,:body,:status,:created_at)""",
+                {
+                    "slug": slug,
+                    "title": title,
+                    "category": request.form.get("category"),
+                    "body": request.form.get("body"),
+                    "status": request.form.get("status"),
+                    "created_at": datetime.now().isoformat(timespec="minutes"),
+                },
             )
             if request.form.get("status") == "published":
                 BLOG_POSTS_REF[:] = [
@@ -1744,14 +1740,14 @@ def journal():
                         ],
                     }
                 )
-        db.commit()
         reload_blog_posts_from_db()
         flash("Journal updated.", "success")
     return render_template(
         "admin/journal.html",
         admin_section="journal",
-        posts=db.execute("SELECT * FROM blog_posts ORDER BY created_at DESC").fetchall(),
+        posts=database.fetch_all("SELECT * FROM blog_posts ORDER BY created_at DESC"),
     )
+
 
 
 @admin_bp.get("/analytics")
@@ -1791,25 +1787,24 @@ def analytics_export():
 
 @admin_bp.route("/reviews", methods=["GET", "POST"])
 def reviews_admin():
-    db = get_db()
     if request.method == "POST":
         review_id = request.form.get("review_id")
         action = request.form.get("action")
         if action == "approve":
-            db.execute("UPDATE reviews SET status='approved' WHERE id=?", (review_id,))
+            database.execute_write("UPDATE reviews SET status='approved' WHERE id = :id", {"id": review_id})
         elif action == "reject":
-            db.execute("UPDATE reviews SET status='rejected' WHERE id=?", (review_id,))
+            database.execute_write("UPDATE reviews SET status='rejected' WHERE id = :id", {"id": review_id})
         elif action == "delete":
-            db.execute("DELETE FROM reviews WHERE id=?", (review_id,))
-        db.commit()
+            database.execute_write("DELETE FROM reviews WHERE id = :id", {"id": review_id})
         record_activity(f"Review {action}: #{review_id}")
         flash("Review updated.", "success")
-    rows = db.execute("SELECT * FROM reviews ORDER BY created_at DESC").fetchall()
+    rows = database.fetch_all("SELECT * FROM reviews ORDER BY created_at DESC")
     return render_template(
         "admin/reviews.html",
         admin_section="reviews_admin",
         reviews=rows,
     )
+
 
 
 @admin_bp.get("/issues")
@@ -1848,16 +1843,12 @@ def subscribers_export():
 
 @admin_bp.route("/abandoned", methods=["GET", "POST"])
 def abandoned_admin():
-    db = get_db()
     if request.method == "POST":
         cart_id = request.form.get("cart_id")
         if request.form.get("action") == "delete":
-            db.execute("DELETE FROM abandoned_carts WHERE id=?", (cart_id,))
-        db.commit()
+            database.execute_write("DELETE FROM abandoned_carts WHERE id = :id", {"id": cart_id})
         flash("Updated.", "success")
-    rows = db.execute(
-        "SELECT * FROM abandoned_carts ORDER BY created_at DESC"
-    ).fetchall()
+    rows = database.fetch_all("SELECT * FROM abandoned_carts ORDER BY created_at DESC")
     return render_template(
         "admin/abandoned.html",
         admin_section="abandoned_admin",
@@ -1867,27 +1858,24 @@ def abandoned_admin():
 
 @admin_bp.route("/returns", methods=["GET", "POST"])
 def returns_admin():
-    db = get_db()
     if request.method == "POST":
         req_id = request.form.get("return_id")
         new_status = request.form.get("status")
         note = request.form.get("admin_note", "")
         if req_id and new_status:
-            db.execute(
-                "UPDATE return_requests SET status=?, admin_note=? WHERE id=?",
-                (new_status, note, req_id),
+            database.execute_write(
+                "UPDATE return_requests SET status = :status, admin_note = :admin_note WHERE id = :id",
+                {"status": new_status, "admin_note": note, "id": req_id},
             )
-            db.commit()
             record_activity(f"Return request #{req_id} → {new_status}")
             flash("Return request updated.", "success")
-    rows = db.execute(
-        "SELECT * FROM return_requests ORDER BY created_at DESC"
-    ).fetchall()
+    rows = database.fetch_all("SELECT * FROM return_requests ORDER BY created_at DESC")
     return render_template(
         "admin/returns.html",
         admin_section="returns_admin",
         returns=rows,
     )
+
 
 
 @admin_bp.route("/account", methods=["GET", "POST"])

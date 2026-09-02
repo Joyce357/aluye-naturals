@@ -445,19 +445,28 @@ def create_app(test_config=None):
             }
             for item in items
         ]
-        db = get_db()
-        existing = db.execute("SELECT id FROM abandoned_carts WHERE email=?", (email,)).fetchone()
+        existing = database.fetch_one("SELECT id FROM abandoned_carts WHERE email = :email", {"email": email})
         if existing:
-            db.execute(
-                "UPDATE abandoned_carts SET items=?,total=?,reminded=0,created_at=? WHERE id=?",
-                (json.dumps(simple_items), subtotal, datetime.now().isoformat(timespec="minutes"), existing["id"]),
+            database.execute_write(
+                "UPDATE abandoned_carts SET items = :items, total = :total, reminded = 0, created_at = :created_at WHERE id = :id",
+                {
+                    "items": json.dumps(simple_items),
+                    "total": subtotal,
+                    "created_at": datetime.now().isoformat(timespec="minutes"),
+                    "id": existing["id"],
+                },
             )
         else:
-            db.execute(
-                "INSERT INTO abandoned_carts(email,items,total,reminded,created_at) VALUES(?,?,?,0,?)",
-                (email, json.dumps(simple_items), subtotal, datetime.now().isoformat(timespec="minutes")),
+            database.execute_write(
+                "INSERT INTO abandoned_carts(email,items,total,reminded,created_at) VALUES(:email,:items,:total,0,:created_at)",
+                {
+                    "email": email,
+                    "items": json.dumps(simple_items),
+                    "total": subtotal,
+                    "created_at": datetime.now().isoformat(timespec="minutes"),
+                },
             )
-        db.commit()
+
         return {"ok": True}
 
     @app.get("/unsubscribe")
@@ -649,10 +658,11 @@ def create_app(test_config=None):
                 for item in PRODUCTS
                 if item["slug"] != slug and item not in related
             ][: 3 - len(related)]
-        reviews = get_db().execute(
-            "SELECT name, rating, title, body, created_at FROM reviews WHERE product_slug=? AND status='approved' ORDER BY created_at DESC",
-            (slug,),
-        ).fetchall()
+        reviews = database.fetch_all(
+            "SELECT name, rating, title, body, created_at FROM reviews WHERE product_slug = :slug AND status = 'approved' ORDER BY created_at DESC",
+            {"slug": slug},
+        )
+
         return render_template(
             "product.html",
             product=product,
@@ -858,9 +868,9 @@ def create_app(test_config=None):
             status=status, transaction_id=transaction_id,
         )
         deduct_stock(items, reference=order_number)
-        get_db().execute("DELETE FROM abandoned_carts WHERE email=?", (form["email"],))
-        get_db().commit()
+        database.execute_write("DELETE FROM abandoned_carts WHERE email = :email", {"email": form["email"]})
         try:
+
             send_order_emails(
                 order_number, form, items, subtotal, shipping_fee,
                 shipping_quote.get("zone_name"), payment_method, transaction_id,
@@ -1075,13 +1085,19 @@ def create_app(test_config=None):
                 rating = min(5, max(1, int(rating)))
             except (ValueError, TypeError):
                 rating = 5
-            db = get_db()
-            db.execute(
-                "INSERT INTO reviews(product_slug, name, email, rating, title, body, created_at) VALUES(?,?,?,?,?,?,?)",
-                (slug, name, email, rating, title, body_text,
-                 __import__("datetime").datetime.now().isoformat(timespec="minutes")),
+            database.execute_write(
+                "INSERT INTO reviews(product_slug, name, email, rating, title, body, created_at) VALUES(:product_slug, :name, :email, :rating, :title, :body, :created_at)",
+                {
+                    "product_slug": slug,
+                    "name": name,
+                    "email": email,
+                    "rating": rating,
+                    "title": title,
+                    "body": body_text,
+                    "created_at": __import__("datetime").datetime.now().isoformat(timespec="minutes"),
+                },
             )
-            db.commit()
+
             add_notification("review", "New review submitted", f"{name} reviewed {slug}")
             flash("Thank you! Your review is pending approval.", "success")
         else:
@@ -1126,13 +1142,20 @@ def create_app(test_config=None):
             refund_method = request.form.get("refund_method", "").strip()
             if order_number and email and items_text and reason and refund_method:
                 reference = f"RET-{abs(hash((order_number, email))) % 900000 + 100000}"
-                db = get_db()
-                db.execute(
-                    "INSERT OR IGNORE INTO return_requests(reference, order_number, email, items, reason, details, refund_method, created_at) VALUES(?,?,?,?,?,?,?,?)",
-                    (reference, order_number, email, items_text, reason, details, refund_method,
-                     __import__("datetime").datetime.now().isoformat(timespec="minutes")),
+                database.execute_write(
+                    "INSERT INTO return_requests(reference, order_number, email, items, reason, details, refund_method, created_at) VALUES(:reference, :order_number, :email, :items, :reason, :details, :refund_method, :created_at) ON CONFLICT(reference) DO NOTHING",
+                    {
+                        "reference": reference,
+                        "order_number": order_number,
+                        "email": email,
+                        "items": items_text,
+                        "reason": reason,
+                        "details": details,
+                        "refund_method": refund_method,
+                        "created_at": __import__("datetime").datetime.now().isoformat(timespec="minutes"),
+                    },
                 )
-                db.commit()
+
                 add_notification("return", "New return request", f"{reference} for {order_number}")
                 submitted = True
             else:
