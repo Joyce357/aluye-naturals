@@ -305,7 +305,8 @@ def init_db():
                 "Aluyè Administrator",
                 os.environ.get("ADMIN_EMAIL", "admin@aluyenaturals.com"),
                 generate_password_hash(
-                    os.environ.get("ADMIN_PASSWORD", "aluye2026")
+                    current_app.config.get("ADMIN_PASSWORD")
+                    or os.environ.get("ADMIN_PASSWORD", "aluye2026")
                 ),
                 "Super Admin",
             ),
@@ -604,7 +605,10 @@ def send_mail(subject, recipients, html, reply_to=None):
     current_app.config["MAIL_USERNAME"] = mail_username
     current_app.config["MAIL_PASSWORD"] = mail_password
     current_app.config["MAIL_DEFAULT_SENDER"] = sender_email
-    current_app.config["MAIL_SUPPRESS_SEND"] = not mail_username
+    # Only derive suppress state from credentials when suppression isn't already
+    # forced on (e.g. TESTING=True sets it unconditionally in create_app).
+    if not current_app.config.get("MAIL_SUPPRESS_SEND"):
+        current_app.config["MAIL_SUPPRESS_SEND"] = not mail_username
 
     try:
         mail = Mail(current_app)

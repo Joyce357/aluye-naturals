@@ -107,6 +107,14 @@ def create_app(test_config=None):
     )
     if test_config:
         app.config.update(test_config)
+    # When running tests, guarantee the seeded admin password is the well-known
+    # test credential so tests are never affected by a developer's local .env.
+    if app.config.get("TESTING") and "ADMIN_PASSWORD" not in app.config:
+        app.config["ADMIN_PASSWORD"] = "aluye2026"
+    # Suppress all SMTP sends during tests — the developer's .env may carry a
+    # real MAIL_USERNAME which would otherwise enable live network connections.
+    if app.config.get("TESTING"):
+        app.config["MAIL_SUPPRESS_SEND"] = True
     init_admin(app, PRODUCTS, CATEGORIES, BLOG_POSTS)
 
     @app.before_request
