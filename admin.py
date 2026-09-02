@@ -4,6 +4,7 @@ import json
 import os
 import sqlite3
 import database
+from sqlalchemy import text
 from datetime import datetime, timedelta
 from functools import wraps
 from pathlib import Path
@@ -400,22 +401,26 @@ def reload_blog_posts_from_db():
 
 
 def load_setting(key, default=None):
-    row = get_db().execute("SELECT value FROM settings WHERE key=?", (key,)).fetchone()
+    row = database.fetch_one("SELECT value FROM settings WHERE key = :key", {"key": key})
     if not row:
         return default
     try:
         return json.loads(row["value"])
-    except json.JSONDecodeError:
+    except (json.JSONDecodeError, TypeError):
         return row["value"]
 
 
 def save_setting(key, value):
-    get_db().execute(
-        """INSERT INTO settings(key,value,updated_at) VALUES(?,?,?)
+    database.execute_write(
+        """INSERT INTO settings(key,value,updated_at) VALUES(:key,:value,:updated_at)
            ON CONFLICT(key) DO UPDATE SET value=excluded.value,updated_at=excluded.updated_at""",
-        (key, json.dumps(value), datetime.now().isoformat(timespec="minutes")),
+        {
+            "key": key,
+            "value": json.dumps(value),
+            "updated_at": datetime.now().isoformat(timespec="minutes"),
+        },
     )
-    get_db().commit()
+
 
 
 def save_env_secret(name, value):
@@ -440,45 +445,54 @@ def save_env_secret(name, value):
 
 
 def record_activity(action):
-    get_db().execute(
-        "INSERT INTO activity(username,action,created_at) VALUES(?,?,?)",
-        (
-            session.get("admin_username", "system"),
-            action,
-            datetime.now().isoformat(timespec="minutes"),
-        ),
+    database.execute_write(
+        "INSERT INTO activity(username,action,created_at) VALUES(:username,:action,:created_at)",
+        {
+            "username": session.get("admin_username", "system"),
+            "action": action,
+            "created_at": datetime.now().isoformat(timespec="minutes"),
+        },
     )
-    get_db().commit()
 
 
 def add_notification(kind, title, detail, related_type="", related_id=""):
-    get_db().execute(
+    database.execute_write(
         """INSERT INTO notifications(kind,title,detail,created_at,related_type,related_id)
-           VALUES(?,?,?,?,?,?)""",
-        (kind, title, detail, datetime.now().isoformat(timespec="minutes"), related_type, related_id),
+           VALUES(:kind,:title,:detail,:created_at,:related_type,:related_id)""",
+        {
+            "kind": kind,
+            "title": title,
+            "detail": detail,
+            "created_at": datetime.now().isoformat(timespec="minutes"),
+            "related_type": related_type,
+            "related_id": related_id,
+        },
     )
-    get_db().commit()
+
 
 
 def record_page_view(path):
-    db = get_db()
-    db.execute(
-        """INSERT INTO analytics(path,views) VALUES(?,1)
-           ON CONFLICT(path) DO UPDATE SET views=views+1""",
-        (path,),
+    database.execute_write(
+        """INSERT INTO analytics(path,views) VALUES(:path,1)
+           ON CONFLICT(path) DO UPDATE SET views=analytics.views+1""",
+        {"path": path},
     )
-    db.commit()
 
 
 def record_product_event(slug, event):
     column = "views" if event == "view" else "cart_adds"
-    db = get_db()
-    db.execute(
-        "INSERT INTO product_events(slug,views,cart_adds) VALUES(?,0,0) ON CONFLICT(slug) DO NOTHING",
-        (slug,),
-    )
-    db.execute(f"UPDATE product_events SET {column}={column}+1 WHERE slug=?", (slug,))
-    db.commit()
+    if column not in {"views", "cart_adds"}:
+        return
+    with database.transaction() as conn:
+        conn.execute(
+            text("INSERT INTO product_events(slug,views,cart_adds) VALUES(:slug,0,0) ON CONFLICT(slug) DO NOTHING"),
+            {"slug": slug},
+        )
+        conn.execute(
+            text(f"UPDATE product_events SET {column}={column}+1 WHERE slug=:slug"),
+            {"slug": slug},
+        )
+
 
 
 def save_contact_message(name, email, subject, message):
