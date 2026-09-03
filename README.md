@@ -49,7 +49,10 @@ python app.py
 ## Admin Panel
 - URL: http://127.0.0.1:5000/admin
 - Username: admin
-- Password: aluye2026
+- Password: Set ADMIN_PASSWORD environment variable for initial admin creation
+
+
+
 
 ## Deployment
 - Deployed on Render.com

@@ -44,10 +44,13 @@ def build_db_url(app=None):
         db_url = os.environ.get("DATABASE_URL")
 
     if db_url:
-        # Normalize postgres:// to postgresql:// for SQLAlchemy 2.0+ compatibility
+        # Normalize postgres:// and postgresql:// to postgresql+psycopg:// for psycopg 3
         if db_url.startswith("postgres://"):
-            db_url = db_url.replace("postgres://", "postgresql://", 1)
+            db_url = db_url.replace("postgres://", "postgresql+psycopg://", 1)
+        elif db_url.startswith("postgresql://"):
+            db_url = db_url.replace("postgresql://", "postgresql+psycopg://", 1)
         return db_url
+
 
     # Fallback to SQLite (via ADMIN_DATABASE or default path)
     admin_db = None

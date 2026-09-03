@@ -133,228 +133,107 @@ def close_db(_error=None):
 
 
 def init_db():
-    db = get_db()
-    db.executescript(
-        """
-        CREATE TABLE IF NOT EXISTS admin_users (
-          id INTEGER PRIMARY KEY, username TEXT UNIQUE NOT NULL, name TEXT NOT NULL,
-          email TEXT, password_hash TEXT NOT NULL, role TEXT NOT NULL DEFAULT 'Super Admin'
-        );
-        CREATE TABLE IF NOT EXISTS products (
-          slug TEXT PRIMARY KEY, data TEXT NOT NULL, stock INTEGER NOT NULL DEFAULT 20,
-          status TEXT NOT NULL DEFAULT 'active', updated_at TEXT NOT NULL
-        );
-        CREATE TABLE IF NOT EXISTS orders (
-          id INTEGER PRIMARY KEY AUTOINCREMENT, order_number TEXT UNIQUE NOT NULL,
-          customer_name TEXT NOT NULL, email TEXT, address TEXT, items TEXT NOT NULL,
-          total REAL NOT NULL, status TEXT NOT NULL DEFAULT 'Pending',
-          tracking TEXT DEFAULT '', payment_method TEXT DEFAULT 'Online payment',
-          created_at TEXT NOT NULL, updated_at TEXT NOT NULL
-        );
-        CREATE TABLE IF NOT EXISTS messages (
-          id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, email TEXT NOT NULL,
-          subject TEXT NOT NULL, message TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'unread',
-          created_at TEXT NOT NULL
-        );
-        CREATE TABLE IF NOT EXISTS notifications (
-          id INTEGER PRIMARY KEY AUTOINCREMENT, kind TEXT NOT NULL, title TEXT NOT NULL,
-          detail TEXT NOT NULL, is_read INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL
-        );
-        CREATE TABLE IF NOT EXISTS settings (
-          key TEXT PRIMARY KEY, value TEXT NOT NULL, updated_at TEXT NOT NULL
-        );
-        CREATE TABLE IF NOT EXISTS discounts (
-          id INTEGER PRIMARY KEY AUTOINCREMENT, code TEXT UNIQUE NOT NULL, type TEXT NOT NULL,
-          value REAL NOT NULL, minimum REAL DEFAULT 0, expiry TEXT, usage_limit INTEGER DEFAULT 0,
-          used INTEGER DEFAULT 0, enabled INTEGER DEFAULT 1
-        );
-        CREATE TABLE IF NOT EXISTS shipping_zones (
-          id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, rate REAL NOT NULL,
-          threshold REAL NOT NULL, delivery_days TEXT NOT NULL, enabled INTEGER DEFAULT 1
-        );
-        CREATE TABLE IF NOT EXISTS blog_posts (
-          id INTEGER PRIMARY KEY AUTOINCREMENT, slug TEXT UNIQUE NOT NULL, title TEXT NOT NULL,
-          category TEXT NOT NULL, body TEXT NOT NULL, status TEXT NOT NULL, created_at TEXT NOT NULL
-        );
-        CREATE TABLE IF NOT EXISTS analytics (
-          path TEXT PRIMARY KEY, views INTEGER NOT NULL DEFAULT 0
-        );
-        CREATE TABLE IF NOT EXISTS product_events (
-          slug TEXT PRIMARY KEY, views INTEGER NOT NULL DEFAULT 0, cart_adds INTEGER NOT NULL DEFAULT 0
-        );
-        CREATE TABLE IF NOT EXISTS activity (
-          id INTEGER PRIMARY KEY AUTOINCREMENT, username TEXT NOT NULL, action TEXT NOT NULL,
-          created_at TEXT NOT NULL
-        );
-        CREATE TABLE IF NOT EXISTS subscribers (
-          id INTEGER PRIMARY KEY AUTOINCREMENT, email TEXT UNIQUE NOT NULL, created_at TEXT NOT NULL
-        );
-        CREATE TABLE IF NOT EXISTS reviews (
-          id INTEGER PRIMARY KEY AUTOINCREMENT, product_slug TEXT NOT NULL, name TEXT NOT NULL,
-          email TEXT NOT NULL, rating INTEGER NOT NULL, title TEXT NOT NULL, body TEXT NOT NULL,
-          photo TEXT DEFAULT '', status TEXT NOT NULL DEFAULT 'pending',
-          created_at TEXT NOT NULL
-        );
-        CREATE TABLE IF NOT EXISTS wishlist (
-          id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER, product_slug TEXT NOT NULL,
-          created_at TEXT NOT NULL
-        );
-        CREATE TABLE IF NOT EXISTS ugc_photos (
-          id INTEGER PRIMARY KEY AUTOINCREMENT, image TEXT NOT NULL, customer_name TEXT NOT NULL,
-          product_slug TEXT DEFAULT '', active INTEGER DEFAULT 1, sort_order INTEGER DEFAULT 0,
-          created_at TEXT NOT NULL
-        );
-        CREATE TABLE IF NOT EXISTS abandoned_carts (
-          id INTEGER PRIMARY KEY AUTOINCREMENT, email TEXT NOT NULL, items TEXT NOT NULL,
-          total REAL NOT NULL, reminded INTEGER DEFAULT 0, created_at TEXT NOT NULL
-        );
-        CREATE TABLE IF NOT EXISTS return_requests (
-          id INTEGER PRIMARY KEY AUTOINCREMENT, reference TEXT UNIQUE NOT NULL,
-          order_number TEXT NOT NULL, email TEXT NOT NULL, items TEXT NOT NULL,
-          reason TEXT NOT NULL, details TEXT DEFAULT '', refund_method TEXT NOT NULL,
-          status TEXT NOT NULL DEFAULT 'Pending', admin_note TEXT DEFAULT '',
-          created_at TEXT NOT NULL
-        );
-        CREATE TABLE IF NOT EXISTS waitlist (
-          id INTEGER PRIMARY KEY AUTOINCREMENT, product_slug TEXT NOT NULL, email TEXT NOT NULL,
-          created_at TEXT NOT NULL, UNIQUE(product_slug, email)
-        );
-        CREATE TABLE IF NOT EXISTS referrals (
-          id INTEGER PRIMARY KEY AUTOINCREMENT, referrer_code TEXT NOT NULL,
-          referred_email TEXT, status TEXT NOT NULL DEFAULT 'pending',
-          created_at TEXT NOT NULL
-        );
-        CREATE TABLE IF NOT EXISTS loyalty_points (
-          id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER NOT NULL, action TEXT NOT NULL,
-          points INTEGER NOT NULL, created_at TEXT NOT NULL
-        );
-        CREATE TABLE IF NOT EXISTS quiz_responses (
-          id INTEGER PRIMARY KEY AUTOINCREMENT, skin_type TEXT, skin_concern TEXT,
-          hair_concern TEXT, beard TEXT, budget TEXT, created_at TEXT NOT NULL
-        );
-        CREATE TABLE IF NOT EXISTS message_replies (
-          id INTEGER PRIMARY KEY AUTOINCREMENT, message_id INTEGER NOT NULL,
-          reply_text TEXT NOT NULL, replied_by TEXT NOT NULL,
-          created_at TEXT NOT NULL,
-          FOREIGN KEY(message_id) REFERENCES messages(id)
-        );
-        CREATE TABLE IF NOT EXISTS message_drafts (
-          message_id INTEGER PRIMARY KEY, draft_text TEXT NOT NULL,
-          updated_at TEXT NOT NULL,
-          FOREIGN KEY(message_id) REFERENCES messages(id)
-        );
-        CREATE TABLE IF NOT EXISTS customers (
-          id INTEGER PRIMARY KEY AUTOINCREMENT, first_name TEXT NOT NULL,
-          last_name TEXT NOT NULL, email TEXT UNIQUE NOT NULL,
-          password_hash TEXT NOT NULL, phone TEXT DEFAULT '',
-          address TEXT DEFAULT '', city TEXT DEFAULT '',
-          state TEXT DEFAULT '', postal_code TEXT DEFAULT '',
-          country TEXT DEFAULT '', created_at TEXT NOT NULL
-        );
-        CREATE TABLE IF NOT EXISTS stock_log (
-          id INTEGER PRIMARY KEY AUTOINCREMENT, product_slug TEXT NOT NULL,
-          change_qty INTEGER NOT NULL, reason TEXT NOT NULL, reference TEXT DEFAULT '',
-          stock_after INTEGER NOT NULL, created_at TEXT NOT NULL
-        );
-        CREATE TABLE IF NOT EXISTS gift_cards (
-          id INTEGER PRIMARY KEY AUTOINCREMENT, code TEXT UNIQUE NOT NULL,
-          original_value REAL NOT NULL, remaining REAL NOT NULL,
-          from_name TEXT DEFAULT '', to_name TEXT DEFAULT '',
-          to_email TEXT DEFAULT '', message TEXT DEFAULT '',
-          status TEXT NOT NULL DEFAULT 'active',
-          created_at TEXT NOT NULL, expires_at TEXT NOT NULL
-        );
-        """
-    )
-    try:
-        db.execute("ALTER TABLE subscribers ADD COLUMN source TEXT DEFAULT 'website'")
-    except sqlite3.OperationalError:
-        pass
-    try:
-        db.execute("ALTER TABLE shipping_zones ADD COLUMN postal_prefixes TEXT DEFAULT ''")
-    except sqlite3.OperationalError:
-        pass
-    try:
-        db.execute("ALTER TABLE orders ADD COLUMN transaction_id TEXT DEFAULT ''")
-    except sqlite3.OperationalError:
-        pass
-    try:
-        db.execute("ALTER TABLE orders ADD COLUMN shipping_fee REAL DEFAULT 0")
-    except sqlite3.OperationalError:
-        pass
-    try:
-        db.execute("ALTER TABLE orders ADD COLUMN phone TEXT DEFAULT ''")
-    except sqlite3.OperationalError:
-        pass
-    try:
-        db.execute("ALTER TABLE notifications ADD COLUMN related_type TEXT DEFAULT ''")
-    except sqlite3.OperationalError:
-        pass
-    try:
-        db.execute("ALTER TABLE notifications ADD COLUMN related_id TEXT DEFAULT ''")
-    except sqlite3.OperationalError:
-        pass
-    try:
-        db.execute("ALTER TABLE notifications ADD COLUMN archived INTEGER DEFAULT 0")
-    except sqlite3.OperationalError:
-        pass
-    if not db.execute("SELECT 1 FROM admin_users LIMIT 1").fetchone():
-        db.execute(
+    import schema
+
+    engine = database.get_engine()
+    if engine.dialect.name == "postgresql":
+        try:
+            has_table = database.fetch_one(
+                "SELECT 1 FROM information_schema.tables WHERE table_name = 'admin_users'"
+            )
+        except Exception:
+            has_table = None
+        if not has_table:
+            raise RuntimeError("Database schema is not initialized. Run alembic upgrade head.")
+    else:
+        schema.metadata.create_all(engine)
+
+    if not database.fetch_one("SELECT 1 FROM admin_users LIMIT 1"):
+        admin_pass = current_app.config.get("ADMIN_PASSWORD") or os.environ.get("ADMIN_PASSWORD")
+        if not admin_pass:
+            if current_app.config.get("TESTING"):
+                admin_pass = "aluye2026"
+            else:
+                raise RuntimeError(
+                    "ADMIN_PASSWORD environment variable or app config must be specified for initial admin creation."
+                )
+        database.execute_write(
             """INSERT INTO admin_users(username,name,email,password_hash,role)
-               VALUES(?,?,?,?,?)""",
-            (
-                os.environ.get("ADMIN_USERNAME", "admin"),
-                "Aluyè Administrator",
-                os.environ.get("ADMIN_EMAIL", "admin@aluyenaturals.com"),
-                generate_password_hash(
-                    current_app.config.get("ADMIN_PASSWORD")
-                    or os.environ.get("ADMIN_PASSWORD", "aluye2026")
-                ),
-                "Super Admin",
-            ),
+               VALUES(:username,:name,:email,:password_hash,:role)""",
+            {
+                "username": os.environ.get("ADMIN_USERNAME", "admin"),
+                "name": "Aluyè Administrator",
+                "email": os.environ.get("ADMIN_EMAIL", "admin@aluyenaturals.com"),
+                "password_hash": generate_password_hash(admin_pass),
+                "role": "Super Admin",
+            },
         )
 
-    if not db.execute("SELECT 1 FROM shipping_zones LIMIT 1").fetchone():
-        db.executemany(
-            "INSERT INTO shipping_zones(name,rate,threshold,delivery_days,postal_prefixes) VALUES(?,?,?,?,?)",
-            [
-                ("Ontario (local)", 8, 0, "1–3 business days", "K,L,M,N,P"),
-                ("Rest of Canada", 15, 0, "3–7 business days", ""),
-                ("United States", 25, 0, "5–10 business days", ""),
-                ("Rest of World", 35, 0, "10–21 business days", ""),
-            ],
-        )
+    if not database.fetch_one("SELECT 1 FROM shipping_zones LIMIT 1"):
+        zones = [
+            ("Ontario (local)", 8.0, 0.0, "1–3 business days", "K,L,M,N,P"),
+            ("Rest of Canada", 15.0, 0.0, "3–7 business days", ""),
+            ("United States", 25.0, 0.0, "5–10 business days", ""),
+            ("Rest of World", 35.0, 0.0, "10–21 business days", ""),
+        ]
+        for name, rate, threshold, days, prefixes in zones:
+            database.execute_write(
+                """INSERT INTO shipping_zones(name,rate,threshold,delivery_days,postal_prefixes)
+                   VALUES(:name,:rate,:threshold,:delivery_days,:postal_prefixes)""",
+                {
+                    "name": name,
+                    "rate": rate,
+                    "threshold": threshold,
+                    "delivery_days": days,
+                    "postal_prefixes": prefixes,
+                },
+            )
 
-    if not db.execute("SELECT 1 FROM discounts LIMIT 1").fetchone():
-        db.executemany(
-            "INSERT INTO discounts(code,type,value,minimum,expiry,usage_limit,used) VALUES(?,?,?,?,?,?,?)",
-            [
-                ("RITUAL15", "percent", 15, 50, "2026-12-31", 500, 37),
-                ("WELCOME10", "fixed", 10, 40, "2026-09-30", 250, 82),
-                ("RITUAL10", "percent", 10, 0, "2027-12-31", 0, 0),
-            ],
-        )
+    should_seed_discounts = current_app.config.get("SEED_DEFAULT_DISCOUNTS", False) or current_app.config.get("TESTING", False)
+    if should_seed_discounts and not database.fetch_one("SELECT 1 FROM discounts LIMIT 1"):
+        discs = [
+            ("RITUAL15", "percent", 15.0, 50.0, "2026-12-31", 500, 37),
+            ("WELCOME10", "fixed", 10.0, 40.0, "2026-09-30", 250, 82),
+            ("RITUAL10", "percent", 10.0, 0.0, "2027-12-31", 0, 0),
+        ]
+        for code, type_, val, min_, exp, limit, used in discs:
+            database.execute_write(
+                """INSERT INTO discounts(code,type,value,minimum,expiry,usage_limit,used)
+                   VALUES(:code,:type,:value,:minimum,:expiry,:usage_limit,:used)""",
+                {
+                    "code": code,
+                    "type": type_,
+                    "value": val,
+                    "minimum": min_,
+                    "expiry": exp,
+                    "usage_limit": limit,
+                    "used": used,
+                },
+            )
 
-    if not db.execute("SELECT 1 FROM orders LIMIT 1").fetchone():
+
+    # Demo orders are ONLY seeded if explicitly configured or during test execution
+    should_seed_demo = current_app.config.get("SEED_DEMO_ORDERS", False) or current_app.config.get("TESTING", False)
+    if should_seed_demo and not database.fetch_one("SELECT 1 FROM orders LIMIT 1"):
         now = datetime.now()
         for index in range(5):
             created = (now - timedelta(days=index)).isoformat(timespec="minutes")
-            db.execute(
+            database.execute_write(
                 """INSERT INTO orders(order_number,customer_name,email,address,items,total,status,created_at,updated_at)
-                   VALUES(?,?,?,?,?,?,?,?,?)""",
-                (
-                    f"AN-2026{105-index}",
-                    ["Joyce A.", "Amara K.", "Nia B.", "Malik T.", "Aisha O."][index],
-                    f"customer{index+1}@example.com",
-                    "Customer shipping address",
-                    json.dumps([{"name": PRODUCTS_REF[index]["name"], "quantity": 1}]),
-                    float(PRODUCTS_REF[index]["price"]),
-                    ["Pending", "Processing", "Shipped", "Delivered", "Delivered"][index],
-                    created,
-                    created,
-                ),
+                   VALUES(:order_number,:customer_name,:email,:address,:items,:total,:status,:created_at,:updated_at)""",
+                {
+                    "order_number": f"AN-2026{105-index}",
+                    "customer_name": ["Joyce A.", "Amara K.", "Nia B.", "Malik T.", "Aisha O."][index],
+                    "email": f"customer{index+1}@example.com",
+                    "address": "Customer shipping address",
+                    "items": json.dumps([{"name": PRODUCTS_REF[index]["name"], "quantity": 1}]),
+                    "total": float(PRODUCTS_REF[index]["price"]),
+                    "status": ["Pending", "Processing", "Shipped", "Delivered", "Delivered"][index],
+                    "created_at": created,
+                    "updated_at": created,
+                },
             )
-    db.commit()
+
 
 
 def sync_products_to_db():
@@ -1452,17 +1331,14 @@ def test_email():
 
 @admin_bp.post("/notifications/read")
 def notifications_read():
-    get_db().execute("UPDATE notifications SET is_read=1")
-    get_db().commit()
+    database.execute_write("UPDATE notifications SET is_read = 1")
     flash("Notifications marked as read.", "success")
     return redirect(url_for("admin.notifications"))
 
 
 @admin_bp.get("/notifications")
 def notifications():
-    rows = get_db().execute(
-        "SELECT * FROM notifications WHERE archived=0 ORDER BY created_at DESC"
-    ).fetchall()
+    rows = database.fetch_all("SELECT * FROM notifications WHERE archived = 0 ORDER BY created_at DESC")
     return render_template(
         "admin/notifications.html",
         admin_section="notifications",
@@ -1480,14 +1356,12 @@ def _notification_related_url(row):
 
 @admin_bp.get("/notifications/<int:notification_id>")
 def notification_detail(notification_id):
-    db = get_db()
-    row = db.execute("SELECT * FROM notifications WHERE id=?", (notification_id,)).fetchone()
+    row = database.fetch_one("SELECT * FROM notifications WHERE id = :id", {"id": notification_id})
     if not row:
         abort(404)
     if not row["is_read"]:
-        db.execute("UPDATE notifications SET is_read=1 WHERE id=?", (notification_id,))
-        db.commit()
-        row = db.execute("SELECT * FROM notifications WHERE id=?", (notification_id,)).fetchone()
+        database.execute_write("UPDATE notifications SET is_read = 1 WHERE id = :id", {"id": notification_id})
+        row = database.fetch_one("SELECT * FROM notifications WHERE id = :id", {"id": notification_id})
     return render_template(
         "admin/notification_detail.html",
         admin_section="notifications",
@@ -1498,18 +1372,17 @@ def notification_detail(notification_id):
 
 @admin_bp.post("/notifications/<int:notification_id>/archive")
 def notification_archive(notification_id):
-    get_db().execute("UPDATE notifications SET archived=1 WHERE id=?", (notification_id,))
-    get_db().commit()
+    database.execute_write("UPDATE notifications SET archived = 1 WHERE id = :id", {"id": notification_id})
     flash("Notification archived.", "success")
     return redirect(url_for("admin.notifications"))
 
 
 @admin_bp.post("/notifications/<int:notification_id>/delete")
 def notification_delete(notification_id):
-    get_db().execute("DELETE FROM notifications WHERE id=?", (notification_id,))
-    get_db().commit()
+    database.execute_write("DELETE FROM notifications WHERE id = :id", {"id": notification_id})
     flash("Notification deleted.", "success")
     return redirect(url_for("admin.notifications"))
+
 
 
 @admin_bp.route("/homepage", methods=["GET", "POST"])
@@ -1981,7 +1854,8 @@ def account():
         "admin/account.html",
         admin_section="account",
         users=database.fetch_all("SELECT * FROM admin_users ORDER BY id"),
-        activity=db.execute("SELECT * FROM activity ORDER BY id DESC LIMIT 20").fetchall(),
+        activity=database.fetch_all("SELECT * FROM activity ORDER BY id DESC LIMIT 20"),
     )
+
 
 

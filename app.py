@@ -1108,19 +1108,19 @@ def create_app(test_config=None):
 
     @app.route("/track-order", methods=["GET", "POST"])
     def track_order():
-        from admin import get_db
         order = None
         error = None
         if request.method == "POST":
             order_number = request.form.get("order_number", "").strip()
             email = request.form.get("email", "").strip()
             if order_number and email:
-                order = get_db().execute(
-                    "SELECT * FROM orders WHERE order_number=? AND email=?",
-                    (order_number, email),
-                ).fetchone()
+                order = database.fetch_one(
+                    "SELECT * FROM orders WHERE order_number = :order_number AND email = :email",
+                    {"order_number": order_number, "email": email},
+                )
                 if not order:
                     error = "Order not found. Please check your order number and email."
+
             else:
                 error = "Please enter both your order number and email."
         return render_template(
