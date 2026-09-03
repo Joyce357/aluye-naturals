@@ -29,3 +29,5 @@ reports/lighthouse/
 .vercel/
 .env.local
 .env.*.local
+public/static/
+

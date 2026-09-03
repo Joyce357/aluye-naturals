@@ -1,10 +1,12 @@
 {
+  "buildCommand": "python scripts/build_vercel.py",
   "rewrites": [
     {
       "source": "/(.*)",
       "destination": "/api/index.py"
     }
   ],
+
   "crons": [
     {
       "path": "/api/cron/abandoned-carts",
