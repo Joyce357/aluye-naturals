@@ -103,6 +103,19 @@ def get_data_dir(app):
     return Path(data_dir)
 
 
+def _parse_bool(val):
+    if val is None:
+        return None
+    if isinstance(val, bool):
+        return val
+    s = str(val).strip().lower()
+    if s in ("true", "1", "yes", "on"):
+        return True
+    if s in ("false", "0", "no", "off"):
+        return False
+    return bool(val)
+
+
 def init_admin(app, products, categories, blog_posts):
     global PRODUCTS_REF, CATALOG_ORDER, CATEGORIES_REF, BLOG_POSTS_REF
     PRODUCTS_REF = products
@@ -126,8 +139,19 @@ def init_admin(app, products, categories, blog_posts):
         sync_products_to_db()
         reload_products_from_db()
         reload_blog_posts_from_db()
-    if not app.config.get("TESTING"):
+    is_vercel = bool(os.environ.get("VERCEL"))
+    is_testing = app.config.get("TESTING")
+    raw_enable = app.config.get("ENABLE_APSCHEDULER")
+    if raw_enable is None:
+        raw_enable = os.environ.get("ENABLE_APSCHEDULER")
+    enable_scheduler = _parse_bool(raw_enable)
+    if enable_scheduler is None:
+        enable_scheduler = not (is_vercel or is_testing)
+    if enable_scheduler:
         start_abandoned_cart_scheduler(app)
+
+
+
 
 
 def get_db():
@@ -329,24 +353,28 @@ def save_setting(key, value):
 
 
 def save_env_secret(name, value):
-    env_path = get_data_dir(current_app) / ".env"
-    lines = env_path.read_text(encoding="utf-8").splitlines() if env_path.exists() else []
-    prefix = f"{name}="
-    replacement = f"{name}={value}"
-    updated = False
-    for index, line in enumerate(lines):
-        if line.startswith(prefix):
-            lines[index] = replacement
-            updated = True
-            break
-    if not updated:
-        lines.append(replacement)
-    env_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
-    # Take effect immediately in this worker process rather than only on next
-    # restart. On platforms with an ephemeral filesystem (e.g. Render without a
-    # persistent disk attached), this .env file will not survive a redeploy —
-    # see MAIL_USERNAME/MAIL_PASSWORD handling for the durable alternative.
+    if os.environ.get("VERCEL"):
+        raise RuntimeError("On Vercel, secret environment variables must be updated in the Vercel Dashboard.")
+
     os.environ[name] = value
+    try:
+        env_path = get_data_dir(current_app) / ".env"
+        lines = env_path.read_text(encoding="utf-8").splitlines() if env_path.exists() else []
+        prefix = f"{name}="
+        replacement = f"{name}={value}"
+        updated = False
+        for index, line in enumerate(lines):
+            if line.startswith(prefix):
+                lines[index] = replacement
+                updated = True
+                break
+        if not updated:
+            lines.append(replacement)
+        env_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    except (OSError, IOError):
+        pass
+
+
 
 
 def record_activity(action):
@@ -464,7 +492,17 @@ def check_abandoned_carts(app):
             "SELECT * FROM abandoned_carts WHERE reminded = 0 AND created_at <= :cutoff",
             {"cutoff": cutoff},
         )
+        processed_count = 0
         for row in rows:
+            # Atomic claim BEFORE sending email
+            res = database.execute_write(
+                "UPDATE abandoned_carts SET reminded = 1 WHERE id = :id AND reminded = 0",
+                {"id": row["id"]},
+            )
+            if res.get("rowcount", 0) == 0:
+                # Another worker claimed or processed this cart
+                continue
+
             items = json.loads(row["items"])
             html_body = render_template(
                 "emails/abandoned_cart.html",
@@ -482,8 +520,18 @@ def check_abandoned_carts(app):
                 html=html_body,
             )
             if not success:
+                # Release claim on failure
+                database.execute_write(
+                    "UPDATE abandoned_carts SET reminded = 0 WHERE id = :id",
+                    {"id": row["id"]},
+                )
                 add_notification("email_error", "Abandoned cart email failed", f"{row['email']}: {error}")
-            database.execute_write("UPDATE abandoned_carts SET reminded = 1 WHERE id = :id", {"id": row["id"]})
+            else:
+                processed_count += 1
+
+        return processed_count
+
+
 
 
 
@@ -1071,16 +1119,23 @@ def product_form(slug=None):
                 "image", "photo_2_2026-06-08_18-19-49.webp"
             )
             saved_images = []
-            uploads_dir = get_data_dir(current_app) / "uploads"
-            uploads_dir.mkdir(parents=True, exist_ok=True)
-            for upload in uploads:
-                if not upload or not upload.filename:
-                    continue
-                filename = secure_filename(upload.filename)
-                upload.save(uploads_dir / filename)
-                saved_images.append(filename)
+            if os.environ.get("VERCEL") and any(u and u.filename for u in uploads):
+                flash("File uploads on Vercel require external cloud storage (S3/Cloudinary/Vercel Blob). Existing static product photos remain fully functional.", "warning")
+            else:
+                uploads_dir = get_data_dir(current_app) / "uploads"
+                try:
+                    uploads_dir.mkdir(parents=True, exist_ok=True)
+                    for upload in uploads:
+                        if not upload or not upload.filename:
+                            continue
+                        filename = secure_filename(upload.filename)
+                        upload.save(uploads_dir / filename)
+                        saved_images.append(filename)
+                except (OSError, IOError):
+                    pass
             if saved_images:
                 image_name = saved_images[0]
+
             try:
                 price = float(request.form.get("price") or 0)
                 compare_at = float(request.form.get("compare_at") or 0)
@@ -1529,7 +1584,10 @@ def global_settings():
             target["paypal_sandbox"] = "paypal_sandbox" in request.form
             mail_password = request.form.get("mail_password", "").strip()
             if mail_password:
-                save_env_secret("MAIL_PASSWORD", mail_password)
+                try:
+                    save_env_secret("MAIL_PASSWORD", mail_password)
+                except RuntimeError as e:
+                    flash(str(e), "warning")
             target["mail_password"] = ""
             target["mail_configured"] = bool(mail_password or settings.get("mail_configured"))
             secret_fields = ("stripe_secret", "paypal_secret", "flutterwave_secret", "paystack_secret")
@@ -1537,11 +1595,15 @@ def global_settings():
                 secret = request.form.get(field, "").strip()
                 provider = field.removesuffix("_secret")
                 if secret:
-                    save_env_secret(field.upper(), secret)
+                    try:
+                        save_env_secret(field.upper(), secret)
+                    except RuntimeError as e:
+                        flash(str(e), "warning")
                 target[field] = ""
                 target[f"{provider}_configured"] = bool(
                     secret or settings.get(f"{provider}_configured")
                 )
+
         if tab == "homepage":
             save_setting("homepage", homepage)
         else:

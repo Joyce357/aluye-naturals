@@ -31,6 +31,7 @@ from flask import (
     Flask,
     abort,
     flash,
+    jsonify,
     make_response,
     redirect,
     render_template,
@@ -39,6 +40,7 @@ from flask import (
     session,
     url_for,
 )
+
 from catalog import (
     BLOG_POSTS as CATALOG_BLOG_POSTS,
     CATEGORIES as CATALOG_CATEGORIES,
@@ -1249,6 +1251,27 @@ def create_app(test_config=None):
         session.pop("customer_email", None)
         flash("Signed out.", "success")
         return redirect(url_for("home"))
+
+    @app.get("/api/cron/abandoned-carts")
+    def cron_abandoned_carts():
+        cron_secret = app.config.get("CRON_SECRET") or os.environ.get("CRON_SECRET")
+        auth_header = request.headers.get("Authorization", "")
+
+        is_authorized = False
+        if cron_secret and auth_header == f"Bearer {cron_secret}":
+            is_authorized = True
+        elif app.config.get("TESTING") and not cron_secret:
+            is_authorized = True
+
+        if not is_authorized:
+            return jsonify({"error": "Unauthorized"}), 401
+
+        from admin import check_abandoned_carts
+        processed = check_abandoned_carts(app)
+        return jsonify({"status": "ok", "processed": processed or 0})
+
+
+
 
     @app.get("/account")
     def account():

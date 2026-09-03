@@ -100,6 +100,10 @@ def get_engine(app=None):
 
     if url.startswith("sqlite"):
         engine_kwargs["connect_args"] = {"check_same_thread": False}
+    elif url.startswith("postgresql"):
+        engine_kwargs["pool_pre_ping"] = True
+        engine_kwargs["pool_recycle"] = 300
+
 
     engine = create_engine(url, **engine_kwargs)
 

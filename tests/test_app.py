@@ -460,3 +460,107 @@ def test_homepage_editor_reorders_and_hides_categories():
     category_section = home.split("Shop Aluyè", 1)[1].split("New This Season", 1)[0]
     assert category_section.find(">Beards<") < category_section.find(">Oil<")
     assert ">African Black Soap<" not in category_section
+
+
+def test_cron_endpoint_protection():
+    app = create_app({"TESTING": False, "CRON_SECRET": "secret-cron-key-123"})
+    client = app.test_client()
+
+    # Unauthorized request without token
+    unauth = client.get("/api/cron/abandoned-carts")
+    assert unauth.status_code == 401
+
+    # Rejected request with query string secret
+    query_unauth = client.get("/api/cron/abandoned-carts?secret=secret-cron-key-123")
+    assert query_unauth.status_code == 401
+
+    # Authorized request with Bearer header
+    auth = client.get("/api/cron/abandoned-carts", headers={"Authorization": "Bearer secret-cron-key-123"})
+    assert auth.status_code == 200
+    assert auth.json.get("status") == "ok"
+
+
+def test_vercel_secret_and_upload_protections(monkeypatch):
+    import admin
+    app = create_app({"TESTING": True})
+    with app.app_context():
+        # Test Vercel secret save rejection
+        monkeypatch.setenv("VERCEL", "1")
+        try:
+            admin.save_env_secret("TEST_VERCEL_VAR", "test_val")
+            assert False, "Should have raised RuntimeError"
+        except RuntimeError as e:
+            assert "Vercel Dashboard" in str(e)
+
+        # Test Local/Render secret save preservation
+        monkeypatch.delenv("VERCEL", raising=False)
+        monkeypatch.setattr(admin.Path, "write_text", lambda *a, **k: None)
+        admin.save_env_secret("TEST_LOCAL_VAR", "local_val")
+        assert os.environ.get("TEST_LOCAL_VAR") == "local_val"
+
+
+def test_abandoned_cart_atomic_claim_concurrency():
+    import admin
+    import database
+    app = create_app({"TESTING": True})
+    with app.app_context():
+        # Setup setting
+        admin.save_setting("settings", {"abandoned_cart_enabled": True, "abandoned_cart_delay_hours": 0})
+
+        # Insert 1 abandoned cart with reminded = 0
+        items_json = json.dumps([{"slug": "chlorophyll-whipped-shea-butter", "quantity": 1, "price": 38.0}])
+        database.execute_write(
+            """INSERT INTO abandoned_carts(email, items, total, reminded, created_at)
+               VALUES('concurrency-test@example.invalid', :items, 38.0, 0, '2000-01-01T00:00:00')""",
+            {"items": items_json},
+        )
+
+        cart = database.fetch_one("SELECT * FROM abandoned_carts WHERE email = 'concurrency-test@example.invalid'")
+        assert cart is not None and cart["reminded"] == 0
+
+        # First worker atomic claim -> succeeds (rowcount == 1)
+        claim1 = database.execute_write(
+            "UPDATE abandoned_carts SET reminded = 1 WHERE id = :id AND reminded = 0",
+            {"id": cart["id"]},
+        )
+        assert claim1["rowcount"] == 1
+
+        # Second worker duplicate claim -> fails (rowcount == 0)
+        claim2 = database.execute_write(
+            "UPDATE abandoned_carts SET reminded = 1 WHERE id = :id AND reminded = 0",
+            {"id": cart["id"]},
+        )
+        assert claim2["rowcount"] == 0
+
+        # Cleanup
+        database.execute_write("DELETE FROM abandoned_carts WHERE email = 'concurrency-test@example.invalid'")
+
+
+def test_abandoned_cart_claim_release_on_email_failure(monkeypatch):
+    import admin
+    import database
+    app = create_app({"TESTING": True})
+    with app.app_context():
+        admin.save_setting("settings", {"abandoned_cart_enabled": True, "abandoned_cart_delay_hours": 0})
+        items_json = json.dumps([{"slug": "chlorophyll-whipped-shea-butter", "quantity": 1, "price": 38.0}])
+        database.execute_write(
+            """INSERT INTO abandoned_carts(email, items, total, reminded, created_at)
+               VALUES('fail-test@example.invalid', :items, 38.0, 0, '2000-01-01T00:00:00')""",
+            {"items": items_json},
+        )
+
+        # Mock send_mail to return failure
+        monkeypatch.setattr(admin, "send_mail", lambda **kwargs: (False, "SMTP connection failed"))
+
+        processed = admin.check_abandoned_carts(app)
+        assert processed == 0
+
+        # Verify claim was released back to 0
+        cart = database.fetch_one("SELECT * FROM abandoned_carts WHERE email = 'fail-test@example.invalid'")
+        assert cart["reminded"] == 0
+
+        # Cleanup
+        database.execute_write("DELETE FROM abandoned_carts WHERE email = 'fail-test@example.invalid'")
+
+
+
