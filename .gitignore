@@ -26,3 +26,6 @@ debug.log
 .lighthouse-profile/
 reports/lighthouse/
 .claude/
+.vercel/
+.env.local
+.env.*.local
