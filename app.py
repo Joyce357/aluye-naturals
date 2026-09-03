@@ -1185,13 +1185,11 @@ def create_app(test_config=None):
 
     @app.route("/login", methods=["GET", "POST"])
     def login():
-        from admin import get_db
         from werkzeug.security import check_password_hash
         if request.method == "POST":
             email = request.form.get("email", "").strip()
             password = request.form.get("password", "")
-            db = get_db()
-            user = db.execute("SELECT * FROM customers WHERE email=?", (email,)).fetchone()
+            user = database.fetch_one("SELECT * FROM customers WHERE email = :email", {"email": email})
             if user and check_password_hash(user["password_hash"], password):
                 session["customer_id"] = user["id"]
                 session["customer_name"] = user["first_name"]
@@ -1204,7 +1202,7 @@ def create_app(test_config=None):
 
     @app.route("/register", methods=["GET", "POST"])
     def register():
-        from admin import get_db, add_notification
+        from admin import add_notification
         from werkzeug.security import generate_password_hash
         if request.method == "POST":
             first = request.form.get("first_name", "").strip()
@@ -1219,22 +1217,27 @@ def create_app(test_config=None):
             elif len(pw) < 8:
                 flash("Password must be at least 8 characters.", "error")
             else:
-                db = get_db()
-                if db.execute("SELECT 1 FROM customers WHERE email=?", (email,)).fetchone():
+                if database.fetch_one("SELECT 1 FROM customers WHERE email = :email", {"email": email}):
                     flash("An account with this email already exists.", "error")
                 else:
-                    db.execute(
-                        "INSERT INTO customers(first_name,last_name,email,password_hash,created_at) VALUES(?,?,?,?,?)",
-                        (first, last, email, generate_password_hash(pw),
-                         __import__("datetime").datetime.now().isoformat(timespec="minutes")),
+                    database.execute_write(
+                        "INSERT INTO customers(first_name,last_name,email,password_hash,created_at) VALUES(:first_name,:last_name,:email,:password_hash,:created_at)",
+                        {
+                            "first_name": first,
+                            "last_name": last,
+                            "email": email,
+                            "password_hash": generate_password_hash(pw),
+                            "created_at": __import__("datetime").datetime.now().isoformat(timespec="minutes"),
+                        },
                     )
-                    db.commit()
-                    session["customer_id"] = db.execute("SELECT id FROM customers WHERE email=?", (email,)).fetchone()["id"]
+                    cust = database.fetch_one("SELECT id FROM customers WHERE email = :email", {"email": email})
+                    session["customer_id"] = cust["id"]
                     session["customer_name"] = first
                     session["customer_email"] = email
                     add_notification("customer", "New customer", f"{first} {last} ({email})")
                     flash(f"Welcome to Aluyè, {first}! Check your email for your 15% off code.", "success")
                     return redirect(url_for("account"))
+
         return render_template("auth/register.html")
 
     @app.get("/logout")

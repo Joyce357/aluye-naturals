@@ -104,8 +104,10 @@ def get_data_dir(app):
 
 
 def init_admin(app, products, categories, blog_posts):
-    global PRODUCTS_REF, CATEGORIES_REF, BLOG_POSTS_REF
+    global PRODUCTS_REF, CATALOG_ORDER, CATEGORIES_REF, BLOG_POSTS_REF
     PRODUCTS_REF = products
+    CATALOG_ORDER = {p["slug"]: i for i, p in enumerate(products)}
+
     CATEGORIES_REF = categories
     BLOG_POSTS_REF = blog_posts
     data_dir = get_data_dir(app)
@@ -296,20 +298,21 @@ def init_db():
         db.execute("ALTER TABLE notifications ADD COLUMN archived INTEGER DEFAULT 0")
     except sqlite3.OperationalError:
         pass
-    if not db.execute("SELECT 1 FROM admin_users LIMIT 1").fetchone():
-        db.execute(
-            "INSERT INTO admin_users(username,name,email,password_hash,role) VALUES(?,?,?,?,?)",
-            (
-                os.environ.get("ADMIN_USERNAME", "admin"),
-                "Aluyè Administrator",
-                os.environ.get("ADMIN_EMAIL", "admin@aluyenaturals.com"),
-                generate_password_hash(
+    if not database.fetch_one("SELECT 1 FROM admin_users LIMIT 1"):
+        database.execute_write(
+            "INSERT INTO admin_users(username,name,email,password_hash,role) VALUES(:username,:name,:email,:password_hash,:role)",
+            {
+                "username": os.environ.get("ADMIN_USERNAME", "admin"),
+                "name": "Aluyè Administrator",
+                "email": os.environ.get("ADMIN_EMAIL", "admin@aluyenaturals.com"),
+                "password_hash": generate_password_hash(
                     current_app.config.get("ADMIN_PASSWORD")
                     or os.environ.get("ADMIN_PASSWORD", "aluye2026")
                 ),
-                "Super Admin",
-            ),
+                "role": "Super Admin",
+            },
         )
+
     if not db.execute("SELECT 1 FROM shipping_zones LIMIT 1").fetchone():
         db.executemany(
             "INSERT INTO shipping_zones(name,rate,threshold,delivery_days,postal_prefixes) VALUES(?,?,?,?,?)",
@@ -352,24 +355,36 @@ def init_db():
 
 
 def sync_products_to_db():
-    db = get_db()
-    if db.execute("SELECT COUNT(*) c FROM products").fetchone()["c"]:
+    cnt = database.fetch_one("SELECT COUNT(*) c FROM products")
+    if cnt and cnt["c"]:
         return
     now = datetime.now().isoformat(timespec="minutes")
     for product in PRODUCTS_REF:
-        db.execute(
-            """INSERT INTO products(slug,data,stock,status,updated_at) VALUES(?,?,?,?,?)
+        database.execute_write(
+            """INSERT INTO products(slug,data,stock,status,updated_at) VALUES(:slug,:data,:stock,:status,:updated_at)
                ON CONFLICT(slug) DO NOTHING""",
-            (product["slug"], json.dumps(product), 20, "active", now),
+            {
+                "slug": product["slug"],
+                "data": json.dumps(product),
+                "stock": 20,
+                "status": "active",
+                "updated_at": now,
+            },
         )
-    db.commit()
 
 
 def reload_products_from_db():
-    rows = get_db().execute(
-        "SELECT data FROM products WHERE status='active' ORDER BY rowid"
-    ).fetchall()
-    PRODUCTS_REF[:] = [json.loads(row["data"]) for row in rows]
+    rows = database.fetch_all("SELECT data FROM products WHERE status='active'")
+    loaded = [json.loads(row["data"]) for row in rows]
+    loaded.sort(
+        key=lambda p: (0, CATALOG_ORDER[p["slug"]])
+        if p.get("slug") in CATALOG_ORDER
+        else (1, p.get("slug", ""))
+    )
+    PRODUCTS_REF[:] = loaded
+
+
+
 
 
 def reload_blog_posts_from_db():
@@ -892,45 +907,91 @@ def save_order(
 
 
 def log_stock_change(product_slug, change_qty, reason, stock_after, reference=""):
-    get_db().execute(
+    database.execute_write(
         """INSERT INTO stock_log(product_slug,change_qty,reason,reference,stock_after,created_at)
-           VALUES(?,?,?,?,?,?)""",
-        (product_slug, change_qty, reason, reference, stock_after, datetime.now().isoformat(timespec="minutes")),
+           VALUES(:product_slug,:change_qty,:reason,:reference,:stock_after,:created_at)""",
+        {
+            "product_slug": product_slug,
+            "change_qty": change_qty,
+            "reason": reason,
+            "reference": reference,
+            "stock_after": stock_after,
+            "created_at": datetime.now().isoformat(timespec="minutes"),
+        },
     )
 
 
 def deduct_stock(items, reference=""):
-    db = get_db()
-    for item in items:
-        slug = item["product"]["slug"]
-        quantity = item["quantity"]
-        row = db.execute("SELECT stock FROM products WHERE slug=?", (slug,)).fetchone()
-        if not row:
-            continue
-        new_stock = max(0, row["stock"] - quantity)
-        db.execute("UPDATE products SET stock=? WHERE slug=?", (new_stock, slug))
-        log_stock_change(slug, -quantity, "order_placed", new_stock, reference=reference)
-        if new_stock < 5:
-            add_notification(
-                "stock", "Low stock alert", f"{item['product']['name']} has {new_stock} units remaining."
+    low_stock_notifications = []
+    with database.transaction() as conn:
+        for item in items:
+            slug = item["product"]["slug"]
+            quantity = item["quantity"]
+            res = conn.execute(
+                database.text("SELECT stock FROM products WHERE slug = :slug"),
+                {"slug": slug},
             )
-    db.commit()
+            row = res.mappings().first()
+            if not row:
+                continue
+            new_stock = max(0, row["stock"] - quantity)
+            conn.execute(
+                database.text("UPDATE products SET stock = :stock WHERE slug = :slug"),
+                {"stock": new_stock, "slug": slug},
+            )
+            conn.execute(
+                database.text(
+                    """INSERT INTO stock_log(product_slug,change_qty,reason,reference,stock_after,created_at)
+                       VALUES(:product_slug,:change_qty,:reason,:reference,:stock_after,:created_at)"""
+                ),
+                {
+                    "product_slug": slug,
+                    "change_qty": -quantity,
+                    "reason": "order_placed",
+                    "reference": reference,
+                    "stock_after": new_stock,
+                    "created_at": datetime.now().isoformat(timespec="minutes"),
+                },
+            )
+            if new_stock < 5:
+                low_stock_notifications.append((item["product"]["name"], new_stock))
+    for name, n_stock in low_stock_notifications:
+        add_notification(
+            "stock", "Low stock alert", f"{name} has {n_stock} units remaining."
+        )
 
 
 def restore_stock(order_items, reference=""):
-    db = get_db()
-    for item in order_items:
-        slug = item.get("slug")
-        if not slug:
-            continue
-        db.execute(
-            "UPDATE products SET stock = stock + ? WHERE slug=?",
-            (item["quantity"], slug),
-        )
-        row = db.execute("SELECT stock FROM products WHERE slug=?", (slug,)).fetchone()
-        if row:
-            log_stock_change(slug, item["quantity"], "order_cancelled", row["stock"], reference=reference)
-    db.commit()
+    with database.transaction() as conn:
+        for item in order_items:
+            slug = item.get("slug")
+            if not slug:
+                continue
+            conn.execute(
+                database.text("UPDATE products SET stock = stock + :qty WHERE slug = :slug"),
+                {"qty": item["quantity"], "slug": slug},
+            )
+            res = conn.execute(
+                database.text("SELECT stock FROM products WHERE slug = :slug"),
+                {"slug": slug},
+            )
+            row = res.mappings().first()
+            if row:
+                conn.execute(
+                    database.text(
+                        """INSERT INTO stock_log(product_slug,change_qty,reason,reference,stock_after,created_at)
+                           VALUES(:product_slug,:change_qty,:reason,:reference,:stock_after,:created_at)"""
+                    ),
+                    {
+                        "product_slug": slug,
+                        "change_qty": item["quantity"],
+                        "reason": "order_cancelled",
+                        "reference": reference,
+                        "stock_after": row["stock"],
+                        "created_at": datetime.now().isoformat(timespec="minutes"),
+                    },
+                )
+
 
 
 def admin_required(view):
@@ -986,10 +1047,11 @@ def login():
     if request.method == "POST":
         username = request.form.get("username", "").strip()
         password = request.form.get("password", "")
-        user = get_db().execute(
-            "SELECT * FROM admin_users WHERE username=?", (username,)
-        ).fetchone()
+        user = database.fetch_one(
+            "SELECT * FROM admin_users WHERE username = :username", {"username": username}
+        )
         if user and check_password_hash(user["password_hash"], password):
+
             session.update(
                 admin_user_id=user["id"],
                 admin_username=user["username"],
@@ -1017,9 +1079,8 @@ def dashboard():
     all_orders = db.execute("SELECT * FROM orders ORDER BY created_at DESC").fetchall()
     orders = [order for order in all_orders if order["created_at"] >= cutoff]
     revenue = sum(row["total"] for row in orders if row["status"] != "Cancelled")
-    low_stock = db.execute(
-        "SELECT COUNT(*) c FROM products WHERE stock < 5"
-    ).fetchone()["c"]
+    low_stock = (database.fetch_one("SELECT COUNT(*) c FROM products WHERE stock < 5") or {}).get("c", 0)
+
     metrics = [
         ("Total revenue", f"${revenue:,.2f}", "This month"),
         ("Total orders", len(orders), f"{sum(o['status']=='Pending' for o in all_orders)} pending"),
@@ -1045,25 +1106,25 @@ def dashboard():
 
 @admin_bp.route("/products", methods=["GET", "POST"])
 def products():
-    db = get_db()
     if request.method == "POST":
         action = request.form.get("bulk_action")
         selected = request.form.getlist("selected")
         if selected:
             if action == "delete":
-                db.executemany("DELETE FROM products WHERE slug=?", [(s,) for s in selected])
+                for s in selected:
+                    database.execute_write("DELETE FROM products WHERE slug = :slug", {"slug": s})
                 PRODUCTS_REF[:] = [p for p in PRODUCTS_REF if p["slug"] not in selected]
             elif action in {"active", "draft"}:
-                db.executemany(
-                    "UPDATE products SET status=? WHERE slug=?",
-                    [(action, s) for s in selected],
-                )
-            db.commit()
+                for s in selected:
+                    database.execute_write(
+                        "UPDATE products SET status = :status WHERE slug = :slug",
+                        {"status": action, "slug": s},
+                    )
             reload_products_from_db()
             for selected_slug in selected:
-                row = db.execute(
-                    "SELECT stock,data FROM products WHERE slug=?", (selected_slug,)
-                ).fetchone()
+                row = database.fetch_one(
+                    "SELECT stock,data FROM products WHERE slug = :slug", {"slug": selected_slug}
+                )
                 if row and row["stock"] < 5:
                     add_notification(
                         "stock",
@@ -1073,10 +1134,11 @@ def products():
             record_activity(f"Bulk product action: {action}")
             flash("Products updated.", "success")
         return redirect(url_for("admin.products"))
-    rows = db.execute("SELECT * FROM products ORDER BY updated_at DESC").fetchall()
+    rows = database.fetch_all("SELECT * FROM products ORDER BY updated_at DESC")
     product_rows = [
         {**dict(row), "product": json.loads(row["data"])} for row in rows
     ]
+
     return render_template(
         "admin/products.html",
         admin_section="products",
@@ -1087,10 +1149,7 @@ def products():
 
 @admin_bp.route("/products/stock-log")
 def stock_log():
-    db = get_db()
-    rows = db.execute(
-        "SELECT * FROM stock_log ORDER BY id DESC LIMIT 200"
-    ).fetchall()
+    rows = database.fetch_all("SELECT * FROM stock_log ORDER BY id DESC LIMIT 200")
     return render_template(
         "admin/stock_log.html",
         admin_section="products",
@@ -1098,13 +1157,13 @@ def stock_log():
     )
 
 
+
 @admin_bp.route("/products/new", methods=["GET", "POST"])
 @admin_bp.route("/products/<slug>/edit", methods=["GET", "POST"])
 def product_form(slug=None):
-    db = get_db()
     existing = None
     if slug:
-        row = db.execute("SELECT * FROM products WHERE slug=?", (slug,)).fetchone()
+        row = database.fetch_one("SELECT * FROM products WHERE slug = :slug", {"slug": slug})
         if row:
             existing = {**json.loads(row["data"]), "stock": row["stock"], "status": row["status"]}
     if request.method == "POST":
@@ -1167,20 +1226,25 @@ def product_form(slug=None):
             }
             status = request.form.get("status", "active")
             if slug and slug != new_slug:
-                db.execute("DELETE FROM products WHERE slug=?", (slug,))
+                database.execute_write("DELETE FROM products WHERE slug = :slug", {"slug": slug})
                 PRODUCTS_REF[:] = [p for p in PRODUCTS_REF if p["slug"] != slug]
-            db.execute(
-                """INSERT INTO products(slug,data,stock,status,updated_at) VALUES(?,?,?,?,?)
+            database.execute_write(
+                """INSERT INTO products(slug,data,stock,status,updated_at) VALUES(:slug,:data,:stock,:status,:updated_at)
                    ON CONFLICT(slug) DO UPDATE SET data=excluded.data,stock=excluded.stock,
                    status=excluded.status,updated_at=excluded.updated_at""",
-                (new_slug, json.dumps(product), stock, status, datetime.now().isoformat(timespec="minutes")),
+                {
+                    "slug": new_slug,
+                    "data": json.dumps(product),
+                    "stock": stock,
+                    "status": status,
+                    "updated_at": datetime.now().isoformat(timespec="minutes"),
+                },
             )
             if existing is not None and existing.get("stock") != stock:
                 log_stock_change(
                     new_slug, stock - existing.get("stock", 0), "admin_edit", stock,
                     reference=session.get("admin_username", "admin"),
                 )
-            db.commit()
             reload_products_from_db()
             if stock < 5:
                 add_notification(
@@ -1201,12 +1265,12 @@ def product_form(slug=None):
 
 @admin_bp.post("/products/<slug>/delete")
 def product_delete(slug):
-    get_db().execute("DELETE FROM products WHERE slug=?", (slug,))
-    get_db().commit()
+    database.execute_write("DELETE FROM products WHERE slug = :slug", {"slug": slug})
     reload_products_from_db()
     record_activity(f"Deleted product: {slug}")
     flash("Product deleted.", "success")
     return redirect(url_for("admin.products"))
+
 
 
 @admin_bp.get("/orders")
@@ -1883,26 +1947,35 @@ def account():
     db = get_db()
     if request.method == "POST":
         if request.form.get("new_user"):
-            db.execute(
-                "INSERT INTO admin_users(username,name,email,password_hash,role) VALUES(?,?,?,?,?)",
-                (
-                    request.form.get("username"),
-                    request.form.get("name"),
-                    request.form.get("email"),
-                    generate_password_hash(request.form.get("password")),
-                    request.form.get("role"),
-                ),
-            )
+            new_username = request.form.get("username", "").strip()
+            if database.fetch_one("SELECT 1 FROM admin_users WHERE username = :username", {"username": new_username}):
+                flash("An admin user with this username already exists.", "error")
+            else:
+                database.execute_write(
+                    "INSERT INTO admin_users(username,name,email,password_hash,role) VALUES(:username,:name,:email,:password_hash,:role)",
+                    {
+                        "username": new_username,
+                        "name": request.form.get("name"),
+                        "email": request.form.get("email"),
+                        "password_hash": generate_password_hash(request.form.get("password")),
+                        "role": request.form.get("role"),
+                    },
+                )
+                flash("Account settings saved.", "success")
         elif request.form.get("password"):
-            db.execute(
-                "UPDATE admin_users SET password_hash=? WHERE id=?",
-                (generate_password_hash(request.form["password"]), session["admin_user_id"]),
+            database.execute_write(
+                "UPDATE admin_users SET password_hash = :password_hash WHERE id = :id",
+                {
+                    "password_hash": generate_password_hash(request.form["password"]),
+                    "id": session["admin_user_id"],
+                },
             )
-        db.commit()
-        flash("Account settings saved.", "success")
+            flash("Account settings saved.", "success")
     return render_template(
         "admin/account.html",
         admin_section="account",
-        users=db.execute("SELECT * FROM admin_users ORDER BY id").fetchall(),
+        users=database.fetch_all("SELECT * FROM admin_users ORDER BY id"),
         activity=db.execute("SELECT * FROM activity ORDER BY id DESC LIMIT 20").fetchall(),
     )
+
+
