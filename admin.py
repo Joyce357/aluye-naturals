@@ -111,8 +111,15 @@ def init_admin(app, products, categories, blog_posts):
     CATEGORIES_REF = categories
     BLOG_POSTS_REF = blog_posts
     data_dir = get_data_dir(app)
-    app.config.setdefault("ADMIN_DATABASE", str(data_dir / "aluye_admin.db"))
+    if not (
+        app.config.get("DATABASE_URL")
+        or app.config.get("ADMIN_DATABASE")
+        or os.environ.get("DATABASE_URL")
+        or os.environ.get("ADMIN_DATABASE")
+    ):
+        app.config["ADMIN_DATABASE"] = str(data_dir / "aluye_admin.db")
     database.init_app(app)
+
     app.register_blueprint(admin_bp)
     with app.app_context():
         init_db()
@@ -910,7 +917,9 @@ def protect_admin():
 def inject_admin_context():
     if not request.path.startswith("/admin"):
         return {}
-    db = get_db()
+    notification_row = database.fetch_one(
+        "SELECT COUNT(*) c FROM notifications WHERE is_read=0 AND archived=0"
+    )
     return {
         "admin_nav": NAV_ITEMS,
         "admin_nav_groups": NAV_GROUPS,
@@ -921,11 +930,9 @@ def inject_admin_context():
         "admin_unread_messages": (
             database.fetch_one("SELECT COUNT(*) c FROM messages WHERE status='unread'") or {}
         ).get("c", 0),
-
-        "admin_unread_notifications": db.execute(
-            "SELECT COUNT(*) c FROM notifications WHERE is_read=0 AND archived=0"
-        ).fetchone()["c"],
+        "admin_unread_notifications": (notification_row or {}).get("c", 0),
     }
+
 
 
 @admin_bp.route("/login", methods=["GET", "POST"])
@@ -1558,8 +1565,8 @@ def global_settings():
 
 @admin_bp.route("/shipping", methods=["GET", "POST"])
 def shipping():
-    db = get_db()
     if request.method == "POST":
+
         if request.form.get("form_type") == "settings":
             settings = load_setting("settings", {}) or {}
             settings["shipping_pickup_enabled"] = "shipping_pickup_enabled" in request.form
@@ -1694,11 +1701,8 @@ def journal():
 
 @admin_bp.get("/analytics")
 def analytics():
-    db = get_db()
-    pages = db.execute("SELECT * FROM analytics ORDER BY views DESC").fetchall()
-    products = db.execute(
-        "SELECT * FROM product_events ORDER BY views DESC LIMIT 5"
-    ).fetchall()
+    pages = database.fetch_all("SELECT * FROM analytics ORDER BY views DESC")
+    products = database.fetch_all("SELECT * FROM product_events ORDER BY views DESC LIMIT 5")
     orders = (database.fetch_one("SELECT COUNT(*) c FROM orders") or {}).get("c", 0)
 
     visits = sum(row["views"] for row in pages)
@@ -1718,14 +1722,14 @@ def analytics_export():
     output = io.StringIO()
     writer = csv.writer(output)
     writer.writerow(["Page", "Views"])
-    writer.writerows(
-        get_db().execute("SELECT path,views FROM analytics ORDER BY views DESC").fetchall()
-    )
+    rows = database.fetch_all("SELECT path, views FROM analytics ORDER BY views DESC")
+    writer.writerows([[r["path"], r["views"]] for r in rows])
     return Response(
         output.getvalue(),
         mimetype="text/csv",
         headers={"Content-Disposition": "attachment; filename=aluye-analytics.csv"},
     )
+
 
 
 @admin_bp.route("/reviews", methods=["GET", "POST"])
@@ -1823,8 +1827,8 @@ def returns_admin():
 
 @admin_bp.route("/account", methods=["GET", "POST"])
 def account():
-    db = get_db()
     if request.method == "POST":
+
         if request.form.get("new_user"):
             new_username = request.form.get("username", "").strip()
             if database.fetch_one("SELECT 1 FROM admin_users WHERE username = :username", {"username": new_username}):

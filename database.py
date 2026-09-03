@@ -31,38 +31,44 @@ def _get_data_dir(app=None):
     return path
 
 
+def _normalize_db_url(url):
+    if url.startswith("postgres://"):
+        return url.replace("postgres://", "postgresql+psycopg://", 1)
+    if url.startswith("postgresql://"):
+        return url.replace("postgresql://", "postgresql+psycopg://", 1)
+    return url
+
+
+def _sqlite_url_from_path(path):
+    p = Path(path).as_posix()
+    return f"sqlite:///{p}"
+
+
 def build_db_url(app=None):
     """
-    Determine the database connection URL.
-    - If DATABASE_URL environment variable or app config is present, use it.
-    - Otherwise, build a SQLite database URL based on ADMIN_DATABASE config, DATA_DIR, or instance_path.
+    Determine the database connection URL based on strict priority order:
+    1. app.config["DATABASE_URL"]
+    2. app.config["ADMIN_DATABASE"]
+    3. os.environ["DATABASE_URL"]
+    4. os.environ["ADMIN_DATABASE"]
+    5. default local SQLite instance path
     """
-    db_url = None
-    if app:
-        db_url = app.config.get("DATABASE_URL")
-    if not db_url:
-        db_url = os.environ.get("DATABASE_URL")
+    if app and app.config.get("DATABASE_URL"):
+        return _normalize_db_url(app.config["DATABASE_URL"])
 
-    if db_url:
-        # Normalize postgres:// and postgresql:// to postgresql+psycopg:// for psycopg 3
-        if db_url.startswith("postgres://"):
-            db_url = db_url.replace("postgres://", "postgresql+psycopg://", 1)
-        elif db_url.startswith("postgresql://"):
-            db_url = db_url.replace("postgresql://", "postgresql+psycopg://", 1)
-        return db_url
+    if app and app.config.get("ADMIN_DATABASE"):
+        return _sqlite_url_from_path(app.config["ADMIN_DATABASE"])
+
+    if os.environ.get("DATABASE_URL"):
+        return _normalize_db_url(os.environ["DATABASE_URL"])
+
+    if os.environ.get("ADMIN_DATABASE"):
+        return _sqlite_url_from_path(os.environ["ADMIN_DATABASE"])
+
+    db_path = str(_get_data_dir(app) / "aluye_admin.db")
+    return _sqlite_url_from_path(db_path)
 
 
-    # Fallback to SQLite (via ADMIN_DATABASE or default path)
-    admin_db = None
-    if app:
-        admin_db = app.config.get("ADMIN_DATABASE")
-    if not admin_db:
-        admin_db = os.environ.get("ADMIN_DATABASE")
-    if not admin_db:
-        admin_db = str(_get_data_dir(app) / "aluye_admin.db")
-
-    db_path = Path(admin_db).as_posix()
-    return f"sqlite:///{db_path}"
 
 
 def get_engine(app=None):
