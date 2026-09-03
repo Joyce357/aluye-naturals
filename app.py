@@ -1025,9 +1025,11 @@ def create_app(test_config=None):
     def checkout_confirmation(order_number):
         from admin import get_db
 
-        order = get_db().execute(
-            "SELECT * FROM orders WHERE order_number=?", (order_number,)
-        ).fetchone()
+        order = database.fetch_one(
+            "SELECT * FROM orders WHERE order_number = :order_number",
+            {"order_number": order_number},
+        )
+
         if not order:
             abort(404)
         return render_template(
@@ -1252,11 +1254,10 @@ def create_app(test_config=None):
     def account():
         if not session.get("customer_id"):
             return redirect(url_for("login", next=request.path))
-        from admin import get_db
-        orders = get_db().execute(
-            "SELECT * FROM orders WHERE email=? ORDER BY created_at DESC",
-            (session.get("customer_email", ""),)
-        ).fetchall()
+        orders = database.fetch_all(
+            "SELECT * FROM orders WHERE email = :email ORDER BY created_at DESC",
+            {"email": session.get("customer_email", "")},
+        )
         return render_template("auth/account.html", orders=orders, products=PRODUCTS,
             seo=page_seo("My Account | Aluyè Naturals", "Manage your Aluyè Naturals account.", "/account", robots="noindex"))
 

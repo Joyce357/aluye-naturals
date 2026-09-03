@@ -298,19 +298,20 @@ def init_db():
         db.execute("ALTER TABLE notifications ADD COLUMN archived INTEGER DEFAULT 0")
     except sqlite3.OperationalError:
         pass
-    if not database.fetch_one("SELECT 1 FROM admin_users LIMIT 1"):
-        database.execute_write(
-            "INSERT INTO admin_users(username,name,email,password_hash,role) VALUES(:username,:name,:email,:password_hash,:role)",
-            {
-                "username": os.environ.get("ADMIN_USERNAME", "admin"),
-                "name": "Aluyè Administrator",
-                "email": os.environ.get("ADMIN_EMAIL", "admin@aluyenaturals.com"),
-                "password_hash": generate_password_hash(
+    if not db.execute("SELECT 1 FROM admin_users LIMIT 1").fetchone():
+        db.execute(
+            """INSERT INTO admin_users(username,name,email,password_hash,role)
+               VALUES(?,?,?,?,?)""",
+            (
+                os.environ.get("ADMIN_USERNAME", "admin"),
+                "Aluyè Administrator",
+                os.environ.get("ADMIN_EMAIL", "admin@aluyenaturals.com"),
+                generate_password_hash(
                     current_app.config.get("ADMIN_PASSWORD")
                     or os.environ.get("ADMIN_PASSWORD", "aluye2026")
                 ),
-                "role": "Super Admin",
-            },
+                "Super Admin",
+            ),
         )
 
     if not db.execute("SELECT 1 FROM shipping_zones LIMIT 1").fetchone():
@@ -323,6 +324,7 @@ def init_db():
                 ("Rest of World", 35, 0, "10–21 business days", ""),
             ],
         )
+
     if not db.execute("SELECT 1 FROM discounts LIMIT 1").fetchone():
         db.executemany(
             "INSERT INTO discounts(code,type,value,minimum,expiry,usage_limit,used) VALUES(?,?,?,?,?,?,?)",
@@ -332,6 +334,7 @@ def init_db():
                 ("RITUAL10", "percent", 10, 0, "2027-12-31", 0, 0),
             ],
         )
+
     if not db.execute("SELECT 1 FROM orders LIMIT 1").fetchone():
         now = datetime.now()
         for index in range(5):
@@ -858,17 +861,19 @@ def save_order(
     status="Pending",
     transaction_id="",
 ):
-    db = get_db()
     total = subtotal + shipping_fee
-    db.execute(
-        """INSERT OR IGNORE INTO orders(order_number,customer_name,email,address,items,total,status,
+    now = datetime.now().isoformat(timespec="minutes")
+    database.execute_write(
+        """INSERT INTO orders(order_number,customer_name,email,address,items,total,status,
            payment_method,transaction_id,shipping_fee,phone,created_at,updated_at)
-           VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)""",
-        (
-            order_number,
-            f"{customer['first_name']} {customer['last_name']}",
-            customer["email"],
-            ", ".join(
+           VALUES(:order_number,:customer_name,:email,:address,:items,:total,:status,
+           :payment_method,:transaction_id,:shipping_fee,:phone,:created_at,:updated_at)
+           ON CONFLICT(order_number) DO NOTHING""",
+        {
+            "order_number": order_number,
+            "customer_name": f"{customer['first_name']} {customer['last_name']}",
+            "email": customer["email"],
+            "address": ", ".join(
                 [
                     customer["address"],
                     customer["city"],
@@ -876,7 +881,7 @@ def save_order(
                     customer["country"],
                 ]
             ),
-            json.dumps(
+            "items": json.dumps(
                 [
                     {
                         "slug": item["product"]["slug"],
@@ -887,22 +892,24 @@ def save_order(
                     for item in items
                 ]
             ),
-            total,
-            status,
-            payment_method,
-            transaction_id,
-            shipping_fee,
-            customer.get("phone", ""),
-            datetime.now().isoformat(timespec="minutes"),
-            datetime.now().isoformat(timespec="minutes"),
-        ),
+            "total": total,
+            "status": status,
+            "payment_method": payment_method,
+            "transaction_id": transaction_id,
+            "shipping_fee": shipping_fee,
+            "phone": customer.get("phone", ""),
+            "created_at": now,
+            "updated_at": now,
+        },
     )
-    db.commit()
-    order_row = db.execute("SELECT id FROM orders WHERE order_number=?", (order_number,)).fetchone()
+    order_row = database.fetch_one(
+        "SELECT id FROM orders WHERE order_number = :order_number", {"order_number": order_number}
+    )
     add_notification(
         "order", "New order placed", f"{order_number} · CAD ${total:.2f}",
         related_type="order", related_id=str(order_row["id"]) if order_row else "",
     )
+
     return total
 
 
@@ -1072,14 +1079,14 @@ def logout():
 
 @admin_bp.get("/")
 def dashboard():
-    db = get_db()
     period = request.args.get("period", "month")
     period_days = {"today": 1, "week": 7, "month": 30}.get(period, 30)
     cutoff = (datetime.now() - timedelta(days=period_days)).isoformat(timespec="minutes")
-    all_orders = db.execute("SELECT * FROM orders ORDER BY created_at DESC").fetchall()
+    all_orders = database.fetch_all("SELECT * FROM orders ORDER BY created_at DESC")
     orders = [order for order in all_orders if order["created_at"] >= cutoff]
     revenue = sum(row["total"] for row in orders if row["status"] != "Cancelled")
     low_stock = (database.fetch_one("SELECT COUNT(*) c FROM products WHERE stock < 5") or {}).get("c", 0)
+
 
     metrics = [
         ("Total revenue", f"${revenue:,.2f}", "This month"),
@@ -1272,34 +1279,31 @@ def product_delete(slug):
     return redirect(url_for("admin.products"))
 
 
-
 @admin_bp.get("/orders")
 def orders():
-    rows = get_db().execute("SELECT * FROM orders ORDER BY created_at DESC").fetchall()
+    rows = database.fetch_all("SELECT * FROM orders ORDER BY created_at DESC")
     return render_template("admin/orders.html", admin_section="orders", orders=rows)
 
 
 @admin_bp.route("/orders/<int:order_id>", methods=["GET", "POST"])
 def order_detail(order_id):
-    db = get_db()
     if request.method == "POST":
-        old_order = db.execute(
-            "SELECT order_number,status,items,customer_name,email FROM orders WHERE id=?", (order_id,)
-        ).fetchone()
+        old_order = database.fetch_one(
+            "SELECT order_number,status,items,customer_name,email FROM orders WHERE id = :id", {"id": order_id}
+        )
         new_status = request.form.get("status")
         tracking = request.form.get("tracking", "")
         if new_status == "Cancelled" and old_order and old_order["status"] != "Cancelled":
             restore_stock(json.loads(old_order["items"]), reference=old_order["order_number"])
-        db.execute(
-            "UPDATE orders SET status=?,tracking=?,updated_at=? WHERE id=?",
-            (
-                new_status,
-                tracking,
-                datetime.now().isoformat(timespec="minutes"),
-                order_id,
-            ),
+        database.execute_write(
+            "UPDATE orders SET status = :status, tracking = :tracking, updated_at = :updated_at WHERE id = :id",
+            {
+                "status": new_status,
+                "tracking": tracking,
+                "updated_at": datetime.now().isoformat(timespec="minutes"),
+                "id": order_id,
+            },
         )
-        db.commit()
         if old_order and old_order["status"] != new_status:
             add_notification(
                 "order",
@@ -1310,13 +1314,14 @@ def order_detail(order_id):
                 send_order_status_email(old_order, new_status, tracking)
         record_activity(f"Updated order #{order_id}")
         flash("Order updated.", "success")
-    order = db.execute("SELECT * FROM orders WHERE id=?", (order_id,)).fetchone()
+    order = database.fetch_one("SELECT * FROM orders WHERE id = :id", {"id": order_id})
     return render_template(
         "admin/order_detail.html",
         admin_section="orders",
         order=order,
-        order_items=json.loads(order["items"]),
+        order_items=json.loads(order["items"]) if order else [],
     )
+
 
 
 @admin_bp.route("/messages", methods=["GET", "POST"])
@@ -1821,7 +1826,8 @@ def analytics():
     products = db.execute(
         "SELECT * FROM product_events ORDER BY views DESC LIMIT 5"
     ).fetchall()
-    orders = db.execute("SELECT COUNT(*) c FROM orders").fetchone()["c"]
+    orders = (database.fetch_one("SELECT COUNT(*) c FROM orders") or {}).get("c", 0)
+
     visits = sum(row["views"] for row in pages)
     return render_template(
         "admin/analytics.html",
