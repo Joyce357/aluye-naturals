@@ -47,10 +47,10 @@ def _sqlite_url_from_path(path):
 def build_db_url(app=None):
     """
     Determine the database connection URL based on strict priority order:
-    1. app.config["DATABASE_URL"]
-    2. app.config["ADMIN_DATABASE"]
-    3. os.environ["DATABASE_URL"]
-    4. os.environ["ADMIN_DATABASE"]
+    1. app.config["DATABASE_URL"] (explicit app config override)
+    2. app.config["ADMIN_DATABASE"] (explicit SQLite database path)
+    3. os.environ["DATABASE_URL"] (used for normal non-TESTING application execution)
+    4. os.environ["ADMIN_DATABASE"] (environment SQLite path)
     5. default local SQLite instance path
     """
     if app and app.config.get("DATABASE_URL"):
@@ -59,7 +59,8 @@ def build_db_url(app=None):
     if app and app.config.get("ADMIN_DATABASE"):
         return _sqlite_url_from_path(app.config["ADMIN_DATABASE"])
 
-    if os.environ.get("DATABASE_URL"):
+    is_testing = app and app.config.get("TESTING")
+    if os.environ.get("DATABASE_URL") and not is_testing:
         return _normalize_db_url(os.environ["DATABASE_URL"])
 
     if os.environ.get("ADMIN_DATABASE"):
@@ -67,6 +68,7 @@ def build_db_url(app=None):
 
     db_path = str(_get_data_dir(app) / "aluye_admin.db")
     return _sqlite_url_from_path(db_path)
+
 
 
 
