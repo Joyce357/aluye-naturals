@@ -563,4 +563,83 @@ def test_abandoned_cart_claim_release_on_email_failure(monkeypatch):
         database.execute_write("DELETE FROM abandoned_carts WHERE email = 'fail-test@example.invalid'")
 
 
+def test_no_customer_facing_discounts_on_homepage():
+    app = create_app({"TESTING": True})
+    client = app.test_client()
+    resp = client.get("/")
+    assert resp.status_code == 200
+    html = resp.get_data(as_text=True)
+
+    assert "Get 10% off" not in html
+    assert "Get 15% off" not in html
+    assert "Claim My 10% Off" not in html
+    assert "Before you go" not in html
+    assert 'id="exit-popup"' not in html
+
+
+def test_api_subscribe_functional_and_no_discount():
+    import database
+    app = create_app({"TESTING": True})
+    client = app.test_client()
+    test_email = "regression-sub@example.invalid"
+
+    with app.app_context():
+        database.execute_write("DELETE FROM subscribers WHERE email = :email", {"email": test_email})
+
+        resp = client.post("/api/subscribe", json={"email": test_email, "source": "footer"})
+        assert resp.status_code == 200
+        data = resp.get_json()
+        assert data.get("ok") is True
+        assert data.get("status") == "subscribed"
+        assert "discount_code" not in data
+
+        subscriber = database.fetch_one("SELECT * FROM subscribers WHERE email = :email", {"email": test_email})
+        assert subscriber is not None
+
+        # Clean up
+        database.execute_write("DELETE FROM subscribers WHERE email = :email", {"email": test_email})
+
+
+def test_welcome_email_template_no_discounts():
+    from flask import render_template
+    app = create_app({"TESTING": True})
+    with app.test_request_context():
+        rendered = render_template(
+            "emails/welcome.html",
+            first_name="Jane",
+            email="jane@example.invalid",
+            custom_message="We're excited to have you in our community.",
+            featured_products=[],
+            site_url="https://aluyenaturals.com",
+        )
+        assert "RITUAL10" not in rendered
+        assert "RITUAL15" not in rendered
+        assert "% off" not in rendered
+        assert "welcome gift" not in rendered.lower()
+        assert "discount" not in rendered.lower()
+        assert "Valid for 30 days" not in rendered
+
+
+def test_loyalty_and_ritual_club_copy_neutral():
+    app = create_app({"TESTING": True})
+    client = app.test_client()
+
+    home = client.get("/").get_data(as_text=True)
+    assert "exclusive offers" not in home.lower()
+    assert "offers" not in home.split('id="loyalty"')[1].split('</section>')[0].lower()
+
+    loyalty = client.get("/loyalty").get_data(as_text=True)
+    assert "exclusive offers" not in loyalty.lower()
+    assert "offers" not in loyalty.lower()
+    assert "offers created" not in loyalty.lower()
+
+
+def test_admin_discount_navigation_hidden():
+    import admin
+    nav_labels = [label for _, _, items in admin.NAV_GROUPS for _, label in items]
+    assert "Discount Codes" not in nav_labels
+
+
+
+
 

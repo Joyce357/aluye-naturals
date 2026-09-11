@@ -224,7 +224,7 @@
       <div>
         <p class="eyebrow text-clay">Rewards for your ritual</p>
         <h2 class="mt-3 font-display text-4xl font-semibold md:text-5xl">Join the Aluyè Ritual Club</h2>
-        <p class="mt-4 max-w-2xl text-base leading-7 text-bark">Earn points with every purchase. Redeem for free products and exclusive offers.</p>
+        <p class="mt-4 max-w-2xl text-base leading-7 text-bark">Earn points with every purchase and enjoy rewards as part of the Aluyè Ritual Club.</p>
       </div>
       <a href="{{ url_for('loyalty') }}" class="btn-secondary shrink-0">Learn more<span class="sr-only"> about the Aluyè Ritual Club</span></a>
     </div>
@@ -233,7 +233,7 @@
   <footer class="bg-black text-white">
     <div class="border-b border-white/20">
       <div class="page-shell grid gap-8 py-10 md:grid-cols-[1fr_1.2fr] md:items-center">
-        <div><p class="text-sm font-bold uppercase tracking-wider">{{ homepage_settings.get('signup_heading', 'Get 15% off your first ritual') }}</p><p class="mt-2 text-sm text-white/65">{{ homepage_settings.get('signup_subheading', 'Join for product launches, ingredient guides and members-only offers.') }}</p></div>
+        <div><p class="text-sm font-bold uppercase tracking-wider">{{ homepage_settings.get('signup_heading', 'Join the Aluyè Naturals community') }}</p><p class="mt-2 text-sm text-white/65">{{ homepage_settings.get('signup_subheading', 'Be the first to hear about new products, ingredient guides and ritual tips.') }}</p></div>
         <form id="newsletter-form" class="flex border-b border-white">
           <label for="newsletter-email" class="sr-only">Email address</label>
           <input id="newsletter-email" type="email" required autocomplete="email" class="min-h-12 min-w-0 flex-1 bg-transparent text-base text-white placeholder:text-white/50" placeholder="Email address">
@@ -313,22 +313,6 @@
   </footer>
 
   <div id="toast" class="fixed right-4 top-24 z-[90] pointer-events-none" aria-live="polite"></div>
-
-  {# Feature 14: Exit Intent Popup #}
-  <div id="exit-popup" hidden class="fixed inset-0 z-[90] flex items-center justify-center opacity-0 transition-opacity duration-300">
-    <div data-exit-overlay class="absolute inset-0 bg-black/60"></div>
-    <div class="relative z-10 w-[min(90vw,28rem)] bg-white p-8 text-center shadow-2xl">
-      <span class="font-display text-2xl font-semibold">{{ site_name }}</span>
-      <h2 class="mt-5 font-display text-4xl font-semibold">Before you go...</h2>
-      <p class="mt-3 text-bark">Get 10% off your first ritual</p>
-      <form id="exit-form" novalidate class="mt-6">
-        <input id="exit-email" name="email" type="email" required autocomplete="email" placeholder="Your email address" class="min-h-12 w-full border border-sand bg-cream px-4 text-center">
-        <p id="exit-email-error" class="mt-2 hidden text-sm text-error">Please enter a valid email address.</p>
-        <button type="submit" id="exit-submit-btn" class="btn-primary mt-3 w-full">Claim My 10% Off</button>
-      </form>
-      <button type="button" data-exit-close class="mt-4 text-sm text-bark underline">No thanks</button>
-    </div>
-  </div>
 
   {# Feature 27: Mobile Bottom Nav #}
   <nav class="fixed inset-x-0 bottom-0 z-50 flex items-center justify-around border-t border-neutral-200 bg-white py-2 md:hidden" aria-label="Mobile navigation" id="mobile-bottom-nav">

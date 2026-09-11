@@ -403,7 +403,6 @@ def create_app(test_config=None):
         return {
             "ok": True,
             "status": "subscribed",
-            "discount_code": "RITUAL10" if source == "exit_popup" else "RITUAL15",
         }
 
     @app.get("/api/geo-currency")
@@ -577,7 +576,7 @@ def create_app(test_config=None):
             "loyalty.html",
             seo=page_seo(
                 "Aluyè Ritual Club | Loyalty Programme",
-                "Earn points on Aluyè Naturals purchases and redeem them for products and exclusive offers.",
+                "Earn points on Aluyè Naturals purchases and enjoy Ritual Club rewards.",
                 "/loyalty",
             ),
         )
@@ -1239,7 +1238,7 @@ def create_app(test_config=None):
                     session["customer_name"] = first
                     session["customer_email"] = email
                     add_notification("customer", "New customer", f"{first} {last} ({email})")
-                    flash(f"Welcome to Aluyè, {first}! Check your email for your 15% off code.", "success")
+                    flash(f"Welcome to Aluyè, {first}!", "success")
                     return redirect(url_for("account"))
 
         return render_template("auth/register.html")

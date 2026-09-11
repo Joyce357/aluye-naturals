@@ -41,7 +41,6 @@ NAV_GROUPS = [
         ("orders", "Orders"),
         ("returns_admin", "Returns"),
         ("abandoned_admin", "Abandoned Carts"),
-        ("discounts", "Discount Codes"),
         ("shipping", "Shipping & Delivery"),
     ]),
     ("marketing", "Marketing", [
@@ -614,20 +613,16 @@ def send_welcome_email(email, source="website"):
         return "disabled"
 
     first_name = email.split("@")[0].replace(".", " ").replace("_", " ").title()
-    discount_code = settings.get("welcome_discount_code") or ("RITUAL10" if source == "exit_popup" else "RITUAL15")
-    discount_percent = 10 if source == "exit_popup" else 15
     featured_products = [p for p in PRODUCTS_REF if "Best Seller" in p.get("tags", [])][:3]
 
     html_body = render_template(
         "emails/welcome.html",
         first_name=first_name,
         email=email,
-        discount_code=discount_code,
-        discount_percent=discount_percent,
         custom_message=settings.get("welcome_email_body")
         or "We're excited to have you in our community. You'll be the first to receive "
-        "updates about our natural skincare products, new arrivals, special offers, "
-        "beauty tips, and wellness rituals.",
+        "updates about our natural skincare products, new arrivals, beauty tips, "
+        "ingredient guides and wellness rituals.",
         featured_products=featured_products,
         site_url=current_app.config.get("SITE_URL", ""),
     )
@@ -1462,8 +1457,8 @@ def homepage():
         "brand_story": True,
         "ingredients": True,
         "journal": True,
-        "signup_heading": "Get 15% off your first ritual",
-        "signup_subheading": "Join for product launches, ingredient guides and members-only offers.",
+        "signup_heading": "Join the Aluyè Naturals community",
+        "signup_subheading": "Be the first to hear about new products, ingredient guides and ritual tips.",
         "category_order": "Skin Care,Oil,Hair,Beards,African Black Soap",
         "category_skin_care": True,
         "category_oil": True,
@@ -1516,8 +1511,8 @@ SETTINGS_DEFAULTS = {
     "tagline": "Body · Mind · Soul",
     "store_status": "live",
     "base_currency": "CAD",
-    "signup_heading": "Get 15% off your first ritual",
-    "signup_subheading": "Join for product launches, ingredient guides and members-only offers.",
+    "signup_heading": "Join the Aluyè Naturals community",
+    "signup_subheading": "Be the first to hear about new products, ingredient guides and ritual tips.",
     "copyright_text": "© 2026 Aluyè Naturals. Body. Mind. Soul.",
     "footer_description": "Natural skin, hair, body and beard care rooted in West African ingredients and everyday ritual.",
     "instagram": "https://www.instagram.com/aluye_naturals",
@@ -1531,7 +1526,7 @@ SETTINGS_DEFAULTS = {
     "gift_wrap_price": "3",
     "low_stock_threshold": "5",
     "welcome_email_subject": "Thank you for subscribing to Aluyè Naturals",
-    "welcome_discount_code": "RITUAL15",
+    "welcome_discount_code": "",
     "shipped_email_subject": "Your Aluyè Naturals order has shipped 🌿",
     "shipped_email_message": "Your order is on its way to you.",
     "delivered_email_subject": "Your Aluyè Naturals order has been delivered 🌿",

@@ -184,12 +184,10 @@
       <input type="checkbox" name="welcome_email_enabled" {% if s.get('welcome_email_enabled') %}checked{% endif %} class="size-4 accent-ink">
       <span class="text-sm font-semibold">Send welcome email on signup</span>
     </label>
-    {% for field, label in [("welcome_email_subject", "Welcome email subject"), ("welcome_discount_code", "Discount code in welcome email")] %}
     <div>
-      <label class="text-sm font-semibold">{{ label }}</label>
-      <input name="{{ field }}" value="{{ s.get(field, '') }}" class="mt-1 min-h-12 w-full border border-sand bg-cream px-4">
+      <label class="text-sm font-semibold">Welcome email subject</label>
+      <input name="welcome_email_subject" value="{{ s.get('welcome_email_subject', '') }}" class="mt-1 min-h-12 w-full border border-sand bg-cream px-4">
     </div>
-    {% endfor %}
     <div>
       <label class="text-sm font-semibold">Welcome email body</label>
       <textarea name="welcome_email_body" rows="6" class="mt-1 w-full border border-sand bg-cream p-4">{{ s.get('welcome_email_body', '') }}</textarea>
