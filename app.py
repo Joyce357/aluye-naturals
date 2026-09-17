@@ -156,7 +156,7 @@ def create_app(test_config=None):
         if not site_settings.get("contact_email") or has_broken_translation(
             site_settings.get("contact_email")
         ):
-            site_settings["contact_email"] = "erica@aluyenaturals.com"
+            site_settings["contact_email"] = "info@aluyenaturals.com"
 
         def get_setting(key, default=""):
             aliases = {
