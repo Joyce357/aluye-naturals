@@ -766,6 +766,144 @@ def test_admin_message_reply_plain_text_no_html_template(monkeypatch):
         assert updated_msg["status"] == "replied"
 
 
+def test_paypal_is_configured_logic(monkeypatch):
+    import paypal_client
+
+    # 1. Client ID + PAYPAL_SECRET => PayPal configured (True)
+    monkeypatch.setenv("PAYPAL_SECRET", "valid-secret")
+    assert paypal_client.is_configured({"paypal_client": "valid-client-id"}) is True
+
+    # 2. Client ID without PAYPAL_SECRET => not configured (False)
+    monkeypatch.delenv("PAYPAL_SECRET", raising=False)
+    assert paypal_client.is_configured({"paypal_client": "valid-client-id"}) is False
+
+    # 3. PAYPAL_SECRET without Client ID => not configured (False)
+    monkeypatch.setenv("PAYPAL_SECRET", "valid-secret")
+    assert paypal_client.is_configured({"paypal_client": ""}) is False
+    assert paypal_client.is_configured({}) is False
+    assert paypal_client.is_configured(None) is False
+
+    # 4. Neither => not configured (False)
+    monkeypatch.delenv("PAYPAL_SECRET", raising=False)
+    assert paypal_client.is_configured({}) is False
+
+
+def test_checkout_exposes_paypal_client_id_only_when_truly_configured(monkeypatch):
+    import admin
+    import database
+
+    db_path = os.path.join(tempfile.mkdtemp(), "admin.db")
+    app = create_app(
+        {
+            "TESTING": True,
+            "SECRET_KEY": "paypal-config-test",
+            "ADMIN_DATABASE": db_path,
+        }
+    )
+    client = app.test_client()
+
+    # Add an item to cart so checkout page loads
+    client.post("/cart/add/chlorophyll-whipped-shea-butter", data={"quantity": "1"})
+
+    with app.app_context():
+        # Case A: Stale paypal_configured=True in DB, but PAYPAL_SECRET is missing from env
+        admin.save_setting("settings", {"paypal_client": "my-client-id", "paypal_configured": True})
+        monkeypatch.delenv("PAYPAL_SECRET", raising=False)
+
+        resp = client.get("/checkout")
+        assert resp.status_code == 200
+        html = resp.get_data(as_text=True)
+        assert "client-id=my-client-id" not in html
+        assert 'id="paypal-button-container"' not in html
+        assert ("No payment method is currently available" in html or "PayPal is not configured" in html)
+
+        # Case B: Stale paypal_configured=False in DB, but both paypal_client and PAYPAL_SECRET exist
+        admin.save_setting("settings", {"paypal_client": "real-client-id", "paypal_configured": False})
+        monkeypatch.setenv("PAYPAL_SECRET", "real-secret")
+
+        resp = client.get("/checkout")
+        assert resp.status_code == 200
+        html = resp.get_data(as_text=True)
+        assert "client-id=real-client-id" in html
+        assert 'id="paypal-button-container"' in html
+
+        # Case C: PAYPAL_SECRET exists in env, but paypal_client is empty
+        admin.save_setting("settings", {"paypal_client": "", "paypal_configured": True})
+        monkeypatch.setenv("PAYPAL_SECRET", "real-secret")
+
+        resp = client.get("/checkout")
+        assert resp.status_code == 200
+        html = resp.get_data(as_text=True)
+        assert "https://www.paypal.com/sdk/js" not in html
+        assert 'id="paypal-button-container"' not in html
+
+
+def test_paypal_sandbox_toggle_and_admin_settings_detection(monkeypatch):
+    import admin
+    import database
+    import paypal_client
+
+    db_path = os.path.join(tempfile.mkdtemp(), "admin.db")
+    app = create_app(
+        {
+            "TESTING": True,
+            "SECRET_KEY": "paypal-sandbox-test",
+            "ADMIN_DATABASE": db_path,
+        }
+    )
+    client = app.test_client()
+
+    with app.app_context():
+        # Test base_url with sandbox on/off
+        assert paypal_client._base_url({"paypal_sandbox": True}) == paypal_client.SANDBOX_BASE
+        assert paypal_client._base_url({"paypal_sandbox": False}) == paypal_client.LIVE_BASE
+        assert paypal_client._base_url({}) == paypal_client.SANDBOX_BASE  # default is True
+
+        # Admin login
+        client.post("/admin/login", data={"username": "admin", "password": "aluye2026"})
+
+        # 1. On Vercel simulation: submitting a secret in the form does NOT save secret or falsely connect PayPal without real env var
+        monkeypatch.setenv("VERCEL", "1")
+        monkeypatch.delenv("PAYPAL_SECRET", raising=False)
+
+        resp = client.post(
+            "/admin/global-settings",
+            data={
+                "tab": "integrations",
+                "paypal_client": "my-client-id",
+                "paypal_secret": "typed-secret-in-form",
+                "paypal_sandbox": "on",
+            },
+            follow_redirects=True,
+        )
+        assert resp.status_code == 200
+        html = resp.get_data(as_text=True)
+        assert "On Vercel, secret environment variables must be updated in the Vercel Dashboard" in html
+        settings = admin.load_setting("settings", {})
+        assert settings.get("paypal_configured") is False
+
+        # 2. When PAYPAL_SECRET is in env on Vercel:
+        monkeypatch.setenv("PAYPAL_SECRET", "actual-env-secret")
+        resp = client.get("/admin/global-settings?tab=integrations")
+        assert resp.status_code == 200
+        html = resp.get_data(as_text=True)
+        assert "✓ Connected" in html
+
+        # 3. Test saving sandbox toggle off
+        client.post(
+            "/admin/global-settings",
+            data={
+                "tab": "integrations",
+                "paypal_client": "my-client-id",
+            },
+            follow_redirects=True,
+        )
+        settings = admin.load_setting("settings", {})
+        assert settings.get("paypal_sandbox") is False
+        assert paypal_client._base_url(settings) == paypal_client.LIVE_BASE
+
+
+
 
 
 

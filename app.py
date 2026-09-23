@@ -891,7 +891,8 @@ def create_app(test_config=None):
         errors = {}
         form = {}
         settings = load_setting("settings", {}) or {}
-        paypal_client_id = settings.get("paypal_client") if settings.get("paypal_configured") else None
+        import paypal_client
+        paypal_client_id = settings.get("paypal_client") if paypal_client.is_configured(settings) else None
 
         shipping_method = request.values.get("shipping_method", "standard")
         preview_form = {"postal_code": request.values.get("postal_code", ""), "country": request.values.get("country", "")}

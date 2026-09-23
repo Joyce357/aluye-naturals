@@ -13,7 +13,9 @@ SANDBOX_BASE = "https://api-m.sandbox.paypal.com"
 LIVE_BASE = "https://api-m.paypal.com"
 
 
-def is_configured(settings):
+def is_configured(settings=None):
+    if settings is None:
+        settings = {}
     return bool(settings.get("paypal_client")) and bool(os.environ.get("PAYPAL_SECRET"))
 
 

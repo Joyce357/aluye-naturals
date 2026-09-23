@@ -1577,6 +1577,8 @@ def global_settings():
             if tab in ("homepage", "store", "newsletter", "messages"):
                 target[field] = field in request.form
         if tab == "integrations":
+            import paypal_client
+
             target["paypal_sandbox"] = "paypal_sandbox" in request.form
             mail_password = request.form.get("mail_password", "").strip()
             if mail_password:
@@ -1596,9 +1598,12 @@ def global_settings():
                     except RuntimeError as e:
                         flash(str(e), "warning")
                 target[field] = ""
-                target[f"{provider}_configured"] = bool(
-                    secret or settings.get(f"{provider}_configured")
-                )
+                if provider == "paypal":
+                    target["paypal_configured"] = paypal_client.is_configured(target)
+                else:
+                    target[f"{provider}_configured"] = bool(
+                        secret or settings.get(f"{provider}_configured")
+                    )
 
         if tab == "homepage":
             save_setting("homepage", homepage)
@@ -1608,9 +1613,12 @@ def global_settings():
         flash("Settings saved ✓", "success")
         return redirect(url_for("admin.global_settings") + f"?tab={tab}")
 
+    import paypal_client
+
     all_settings = {**SETTINGS_DEFAULTS}
     all_settings.update(load_setting("settings", {}) or {})
     all_settings.update(load_setting("homepage", {}) or {})
+    all_settings["paypal_configured"] = paypal_client.is_configured(all_settings)
 
     return render_template(
         "admin/global_settings.html",
