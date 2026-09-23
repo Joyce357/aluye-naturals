@@ -903,6 +903,135 @@ def test_paypal_sandbox_toggle_and_admin_settings_detection(monkeypatch):
         assert paypal_client._base_url(settings) == paypal_client.LIVE_BASE
 
 
+def test_admin_order_email_customer_success_and_recipient_integrity(monkeypatch):
+    import admin
+    import database
+
+    db_path = os.path.join(tempfile.mkdtemp(), "admin.db")
+    app = create_app(
+        {
+            "TESTING": True,
+            "SECRET_KEY": "order-email-test",
+            "ADMIN_DATABASE": db_path,
+        }
+    )
+    client = app.test_client()
+
+    captured_mail = []
+
+    def mock_send_mail(subject, recipients, html=None, reply_to=None, body=None):
+        captured_mail.append({
+            "subject": subject,
+            "recipients": recipients,
+            "html": html,
+            "reply_to": reply_to,
+            "body": body,
+        })
+        return True, None
+
+    monkeypatch.setattr(admin, "send_mail", mock_send_mail)
+
+    with app.app_context():
+        # Insert a test order
+        database.execute_write(
+            """INSERT INTO orders(order_number, customer_name, email, address, items, total, status, created_at, updated_at)
+               VALUES('AN-999001', 'Amara Kalu', 'amara@example.invalid', '123 Forest St', '[]', 55.0, 'Processing', '2026-03-01T10:00:00', '2026-03-01T10:00:00')"""
+        )
+        order = database.fetch_one("SELECT id FROM orders WHERE order_number = 'AN-999001'")
+        order_id = order["id"]
+
+        # Log in as admin
+        client.post("/admin/login", data={"username": "admin", "password": "aluye2026"})
+
+        # Verify Order Detail UI renders the composer with read-only email and default subject
+        detail_resp = client.get(f"/admin/orders/{order_id}")
+        assert detail_resp.status_code == 200
+        detail_html = detail_resp.get_data(as_text=True)
+        assert 'id="email-composer-section"' in detail_html
+        assert "amara@example.invalid" in detail_html
+        assert "Update regarding your Aluyè Naturals order AN-999001" in detail_html
+        assert "Email customer" in detail_html
+
+        # Test POSTing an email with custom subject, message, and an attempt to forge recipient email
+        post_data = {
+            "recipient": "hacker@example.invalid",
+            "email": "hacker@example.invalid",
+            "to": "hacker@example.invalid",
+            "subject": "Custom Shipping Update for AN-999001",
+            "message": "We have prepared your batch and it will ship tomorrow morning.",
+        }
+        resp = client.post(f"/admin/orders/{order_id}/email", data=post_data, follow_redirects=True)
+        assert resp.status_code == 200
+        html = resp.get_data(as_text=True)
+        assert "Email sent to amara@example.invalid." in html
+
+        # Verify send_mail invocation
+        assert len(captured_mail) == 1
+        sent = captured_mail[0]
+        # 1. Sends to the email stored on the order (not the forged email)
+        assert sent["recipients"] == ["amara@example.invalid"]
+        assert "hacker@example.invalid" not in sent["recipients"]
+        # 2. Custom subject is preserved
+        assert sent["subject"] == "Custom Shipping Update for AN-999001"
+        # 3. Message is plain text
+        assert sent["html"] is None
+        expected_body = (
+            "Hi Amara,\n\n"
+            "We have prepared your batch and it will ship tomorrow morning.\n\n"
+            "Warm regards,\n"
+            "The Aluyè Naturals Team"
+        )
+        assert sent["body"] == expected_body
+        assert "<" not in sent["body"]
+
+        # Verify order status was NOT changed by email form
+        order_db = database.fetch_one("SELECT status FROM orders WHERE id = :id", {"id": order_id})
+        assert order_db["status"] == "Processing"
+
+
+def test_admin_order_email_customer_smtp_failure(monkeypatch):
+    import admin
+    import database
+
+    db_path = os.path.join(tempfile.mkdtemp(), "admin.db")
+    app = create_app(
+        {
+            "TESTING": True,
+            "SECRET_KEY": "order-email-fail-test",
+            "ADMIN_DATABASE": db_path,
+        }
+    )
+    client = app.test_client()
+
+    # Mock send_mail failure
+    monkeypatch.setattr(admin, "send_mail", lambda **kwargs: (False, "Authentication rejected"))
+
+    with app.app_context():
+        database.execute_write(
+            """INSERT INTO orders(order_number, customer_name, email, address, items, total, status, created_at, updated_at)
+               VALUES('AN-999002', 'Kofi Mensah', 'kofi@example.invalid', '456 Palm Way', '[]', 40.0, 'Pending', '2026-03-01T10:00:00', '2026-03-01T10:00:00')"""
+        )
+        order = database.fetch_one("SELECT id FROM orders WHERE order_number = 'AN-999002'")
+        order_id = order["id"]
+
+        # Log in as admin
+        client.post("/admin/login", data={"username": "admin", "password": "aluye2026"})
+
+        resp = client.post(
+            f"/admin/orders/{order_id}/email",
+            data={
+                "subject": "Order Notice",
+                "message": "Your item is currently resting before packaging.",
+            },
+            follow_redirects=True,
+        )
+        assert resp.status_code == 200
+        html = resp.get_data(as_text=True)
+        # 4. SMTP failure shows an error
+        assert "Email could not be sent: Authentication rejected" in html
+
+
+
 
 
 

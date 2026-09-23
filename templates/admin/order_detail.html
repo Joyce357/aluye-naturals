@@ -1,5 +1,41 @@
 {% extends "admin/base.html" %}{% block title %}{{ order.order_number }} | Aluyè Admin{% endblock %}{% block content %}
-<a href="{{ url_for('admin.orders') }}" class="text-sm font-semibold underline">← Back to orders</a><div class="mt-4 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between"><div><p class="text-xs uppercase tracking-wider text-clay">Order detail</p><h1 class="mt-2 font-display text-5xl font-semibold">{{ order.order_number }}</h1></div><a href="mailto:{{ order.email }}?subject=Update%20for%20{{ order.order_number }}" class="btn-secondary">Email customer</a></div>
+<a href="{{ url_for('admin.orders') }}" class="text-sm font-semibold underline">← Back to orders</a>
+<div class="mt-4 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+  <div>
+    <p class="text-xs uppercase tracking-wider text-clay">Order detail</p>
+    <h1 class="mt-2 font-display text-5xl font-semibold">{{ order.order_number }}</h1>
+  </div>
+  <button type="button" id="email-customer-btn" onclick="document.getElementById('email-composer-section').classList.toggle('hidden')" class="btn-secondary">Email customer</button>
+</div>
+
+<section id="email-composer-section" class="mt-6 hidden border border-sand bg-white p-6">
+  <div class="flex items-center justify-between border-b border-sand pb-4">
+    <div>
+      <h2 class="font-display text-2xl font-semibold">Email Customer</h2>
+      <p class="mt-1 text-xs text-bark">Send a direct email regarding order {{ order.order_number }}.</p>
+    </div>
+    <button type="button" onclick="document.getElementById('email-composer-section').classList.add('hidden')" class="text-sm font-semibold text-bark hover:text-ink">✕ Close</button>
+  </div>
+  <form method="post" action="{{ url_for('admin.order_email', order_id=order.id) }}" class="mt-5 space-y-4">
+    <div>
+      <label class="block text-xs font-semibold uppercase tracking-wider text-bark">To</label>
+      <input type="email" value="{{ order.email }}" readonly class="mt-1 min-h-11 w-full border border-sand bg-cream/70 px-4 text-sm text-bark cursor-not-allowed">
+    </div>
+    <div>
+      <label for="email-subject" class="block text-xs font-semibold uppercase tracking-wider text-bark">Subject</label>
+      <input id="email-subject" name="subject" type="text" value="Update regarding your Aluyè Naturals order {{ order.order_number }}" required class="mt-1 min-h-11 w-full border border-sand bg-white px-4 text-sm">
+    </div>
+    <div>
+      <label for="email-message" class="block text-xs font-semibold uppercase tracking-wider text-bark">Message</label>
+      <textarea id="email-message" name="message" rows="6" required placeholder="Write your message to the customer..." class="mt-1 w-full border border-sand bg-white p-4 text-sm leading-relaxed"></textarea>
+    </div>
+    <div class="flex items-center gap-3 pt-2">
+      <button type="submit" class="btn-primary">Send Email</button>
+      <button type="button" onclick="document.getElementById('email-composer-section').classList.add('hidden')" class="btn-secondary">Cancel</button>
+    </div>
+  </form>
+</section>
+
 <div class="mt-8 grid gap-6 xl:grid-cols-[1fr_22rem]"><section class="border border-sand bg-white p-6"><h2 class="font-display text-3xl font-semibold">Items ordered</h2><div class="mt-5 divide-y divide-sand">{% for item in order_items %}<div class="flex justify-between gap-5 py-4"><span>{{ item.quantity }} × {{ item.name }}</span><strong>{% if item.total %}${{ item.total }}{% endif %}</strong></div>{% endfor %}</div><div class="mt-5 flex justify-between border-t border-ink pt-5 text-lg"><span>Total</span><strong>${{ "%.2f"|format(order.total) }}</strong></div></section>
-<aside class="space-y-6"><section class="border border-sand bg-white p-6"><h2 class="font-display text-2xl font-semibold">Customer</h2><p class="mt-4 font-semibold">{{ order.customer_name }}</p><a href="mailto:{{ order.email }}" class="mt-1 block text-sm underline">{{ order.email }}</a><p class="mt-4 text-sm leading-6 text-bark">{{ order.address }}</p><p class="mt-4 text-sm">Payment: {{ order.payment_method }}</p>{% if order.transaction_id %}<p class="mt-1 text-sm text-bark">Transaction ID: <span class="font-mono">{{ order.transaction_id }}</span></p>{% endif %}</section><form method="post" class="border border-sand bg-white p-6"><h2 class="font-display text-2xl font-semibold">Fulfilment</h2><label class="mt-5 grid gap-2 text-sm font-semibold">Status<select name="status" class="min-h-12 border border-sand px-4">{% for status in ["Pending","Processing","Shipped","Delivered","Cancelled","Refunded"] %}<option {% if order.status==status %}selected{% endif %}>{{ status }}</option>{% endfor %}</select></label><label class="mt-4 grid gap-2 text-sm font-semibold">Tracking number<input name="tracking" value="{{ order.tracking }}" class="min-h-12 border border-sand px-4"></label><button class="btn-primary mt-5 w-full">Update order</button></form></aside></div>
+<aside class="space-y-6"><section class="border border-sand bg-white p-6"><h2 class="font-display text-2xl font-semibold">Customer</h2><p class="mt-4 font-semibold">{{ order.customer_name }}</p><p class="mt-1 block text-sm text-bark">{{ order.email }}</p><p class="mt-4 text-sm leading-6 text-bark">{{ order.address }}</p><p class="mt-4 text-sm">Payment: {{ order.payment_method }}</p>{% if order.transaction_id %}<p class="mt-1 text-sm text-bark">Transaction ID: <span class="font-mono">{{ order.transaction_id }}</span></p>{% endif %}</section><form method="post" class="border border-sand bg-white p-6"><h2 class="font-display text-2xl font-semibold">Fulfilment</h2><label class="mt-5 grid gap-2 text-sm font-semibold">Status<select name="status" class="min-h-12 border border-sand px-4">{% for status in ["Pending","Processing","Shipped","Delivered","Cancelled","Refunded"] %}<option {% if order.status==status %}selected{% endif %}>{{ status }}</option>{% endfor %}</select></label><label class="mt-4 grid gap-2 text-sm font-semibold">Tracking number<input name="tracking" value="{{ order.tracking }}" class="min-h-12 border border-sand px-4"></label><button class="btn-primary mt-5 w-full">Update order</button></form></aside></div>
 {% endblock %}

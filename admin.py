@@ -1260,6 +1260,50 @@ def order_detail(order_id):
     )
 
 
+@admin_bp.post("/orders/<int:order_id>/email")
+def order_email(order_id):
+    order = database.fetch_one("SELECT * FROM orders WHERE id = :id", {"id": order_id})
+    if not order:
+        flash("Order not found.", "error")
+        return redirect(url_for("admin.orders"))
+
+    recipient = order["email"]
+    if not recipient:
+        flash("Order has no customer email address.", "error")
+        return redirect(url_for("admin.order_detail", order_id=order_id))
+
+    default_subject = f"Update regarding your Aluyè Naturals order {order['order_number']}"
+    subject = request.form.get("subject", "").strip() or default_subject
+    message = request.form.get("message", "").strip()
+
+    if not message:
+        flash("Please enter a message to send.", "error")
+        return redirect(url_for("admin.order_detail", order_id=order_id))
+
+    customer_name = order.get("customer_name") or ""
+    first_name = customer_name.strip().split()[0] if customer_name.strip() else "there"
+    plain_body = (
+        f"Hi {first_name},\n\n"
+        f"{message}\n\n"
+        "Warm regards,\n"
+        "The Aluyè Naturals Team"
+    )
+
+    sent, error = send_mail(
+        subject=subject,
+        recipients=[recipient],
+        body=plain_body,
+    )
+
+    if sent:
+        record_activity(f"Sent email to customer for order #{order_id}")
+        flash(f"Email sent to {recipient}.", "success")
+    else:
+        flash(f"Email could not be sent: {error}", "error")
+
+    return redirect(url_for("admin.order_detail", order_id=order_id))
+
+
 
 @admin_bp.route("/messages", methods=["GET", "POST"])
 def messages():
