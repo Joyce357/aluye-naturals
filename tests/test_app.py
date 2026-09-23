@@ -640,6 +640,133 @@ def test_admin_discount_navigation_hidden():
     assert "Discount Codes" not in nav_labels
 
 
+def test_send_mail_plain_text_and_html_support(monkeypatch):
+    import admin
+
+    sent_messages = []
+
+    class DummyMail:
+        def __init__(self, app):
+            pass
+
+        def send(self, msg):
+            sent_messages.append(msg)
+
+    monkeypatch.setattr("flask_mail.Mail", DummyMail)
+
+    app = create_app({"TESTING": True})
+    with app.app_context():
+        # Test plain-text body send
+        success, error = admin.send_mail(
+            subject="Plain Text Subject",
+            recipients=["user@example.invalid"],
+            body="Hello, this is plain text.",
+        )
+        assert success is True
+        assert error is None
+        assert len(sent_messages) == 1
+        msg = sent_messages[0]
+        assert msg.subject == "Plain Text Subject"
+        assert msg.recipients == ["user@example.invalid"]
+        assert msg.body == "Hello, this is plain text."
+        assert msg.html is None
+
+        # Test HTML send
+        success, error = admin.send_mail(
+            subject="HTML Subject",
+            recipients=["user@example.invalid"],
+            html="<p>Hello HTML</p>",
+        )
+        assert success is True
+        assert len(sent_messages) == 2
+        msg = sent_messages[1]
+        assert msg.subject == "HTML Subject"
+        assert msg.html == "<p>Hello HTML</p>"
+        assert msg.body is None
+
+
+def test_admin_message_reply_plain_text_no_html_template(monkeypatch):
+    import admin
+    import database
+
+    db_path = os.path.join(tempfile.mkdtemp(), "admin.db")
+    app = create_app(
+        {
+            "TESTING": True,
+            "SECRET_KEY": "reply-plain-text-test",
+            "ADMIN_DATABASE": db_path,
+        }
+    )
+
+    captured_mail = []
+
+    def mock_send_mail(subject, recipients, html=None, reply_to=None, body=None):
+        captured_mail.append({
+            "subject": subject,
+            "recipients": recipients,
+            "html": html,
+            "reply_to": reply_to,
+            "body": body,
+        })
+        return True, None
+
+    monkeypatch.setattr(admin, "send_mail", mock_send_mail)
+
+    with app.app_context():
+        res = database.execute_write(
+            """INSERT INTO messages(name, email, subject, message, created_at, status)
+               VALUES('Jane Doe', 'jane@example.invalid', 'Order Status Query', 'Where is my order?', '2026-03-01T10:00:00', 'unread')"""
+        )
+        msg_id = res.get("lastrowid") or 1
+
+        client = app.test_client()
+        client.post(
+            "/admin/login",
+            data={"username": "admin", "password": "aluye2026"},
+        )
+
+        reply_payload = {
+            "action": "send",
+            "reply_text": "Your order was dispatched today and is on its way.",
+        }
+        resp = client.post(f"/admin/messages/{msg_id}", data=reply_payload, follow_redirects=True)
+        assert resp.status_code == 200
+
+        # Verify send_mail was called with plain-text body and NO html
+        assert len(captured_mail) == 1
+        sent = captured_mail[0]
+        assert sent["subject"] == "Re: Order Status Query"
+        assert sent["recipients"] == ["jane@example.invalid"]
+        assert sent["html"] is None
+
+        # Verify body structure
+        expected_body = (
+            "Hi Jane Doe,\n\n"
+            "Your order was dispatched today and is on its way.\n\n"
+            "Warm regards,\n"
+            "The Aluyè Naturals Team"
+        )
+        assert sent["body"] == expected_body
+        assert "<" not in sent["body"]
+        assert "http" not in sent["body"]
+
+        # Verify reply was persisted in DB
+        saved_reply = database.fetch_one(
+            "SELECT * FROM message_replies WHERE message_id = :message_id",
+            {"message_id": msg_id},
+        )
+        assert saved_reply is not None
+        assert saved_reply["reply_text"] == "Your order was dispatched today and is on its way."
+
+        # Verify message status was updated
+        updated_msg = database.fetch_one(
+            "SELECT * FROM messages WHERE id = :id",
+            {"id": msg_id},
+        )
+        assert updated_msg["status"] == "replied"
+
+
+
 
 
 

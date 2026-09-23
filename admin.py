@@ -552,7 +552,7 @@ def get_admin_email():
     )
 
 
-def send_mail(subject, recipients, html, reply_to=None):
+def send_mail(subject, recipients, html=None, reply_to=None, body=None):
     """Send an email using admin-configured SMTP settings (Global Settings -> Integrations),
     falling back to environment variables. Returns (success, error_message)."""
     from flask import current_app
@@ -591,6 +591,7 @@ def send_mail(subject, recipients, html, reply_to=None):
             subject=subject,
             sender=("Aluyè Naturals", sender_email) if sender_email else None,
             recipients=recipients,
+            body=body,
             html=html,
             reply_to=reply_to,
         )
@@ -1309,16 +1310,16 @@ def message_detail(message_id):
             return redirect(url_for("admin.message_detail", message_id=message_id))
 
         if action == "send" and reply_text:
-            email_html = render_template(
-                "emails/reply.html",
-                reply_text=reply_text,
-                customer_name=msg["name"],
-                site_url=current_app.config.get("SITE_URL", ""),
+            plain_body = (
+                f"Hi {msg['name']},\n\n"
+                f"{reply_text}\n\n"
+                "Warm regards,\n"
+                "The Aluyè Naturals Team"
             )
             sent, mail_error = send_mail(
                 subject=f"Re: {msg['subject']}",
                 recipients=[msg["email"]],
-                html=email_html,
+                body=plain_body,
             )
 
             with database.transaction() as conn:
